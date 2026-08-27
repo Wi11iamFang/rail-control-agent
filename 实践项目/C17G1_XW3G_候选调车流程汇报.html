@@ -1,0 +1,662 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>C17G1 到 XW3G 候选调车流程汇报</title>
+  <style>
+    :root {
+      --ink: #1f2933;
+      --muted: #5f6b7a;
+      --line: #d7dde5;
+      --panel: #f7f9fc;
+      --accent: #b7791f;
+      --accent-strong: #975a16;
+      --blue: #1f5f99;
+      --green: #287a4b;
+      --red: #b83232;
+      --white: #ffffff;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      color: var(--ink);
+      background: #eef2f6;
+      font-family: "Microsoft YaHei", "Segoe UI", Arial, sans-serif;
+      line-height: 1.68;
+    }
+
+    .page {
+      max-width: 1180px;
+      margin: 0 auto;
+      background: var(--white);
+      min-height: 100vh;
+      box-shadow: 0 24px 80px rgba(15, 23, 42, 0.12);
+    }
+
+    header {
+      padding: 34px 46px 24px;
+      border-bottom: 1px solid var(--line);
+      background: linear-gradient(180deg, #ffffff 0%, #f8fafc 100%);
+    }
+
+    h1 {
+      margin: 0 0 12px;
+      font-size: 30px;
+      line-height: 1.25;
+      letter-spacing: 0;
+    }
+
+    .answer {
+      max-width: 980px;
+      margin: 0;
+      padding-left: 16px;
+      border-left: 4px solid var(--accent);
+      font-size: 17px;
+      font-weight: 600;
+    }
+
+    main {
+      padding: 28px 46px 54px;
+    }
+
+    section {
+      margin-top: 34px;
+    }
+
+    h2 {
+      margin: 0 0 16px;
+      font-size: 22px;
+      line-height: 1.35;
+      letter-spacing: 0;
+      color: #182431;
+    }
+
+    h3 {
+      margin: 22px 0 10px;
+      font-size: 17px;
+      line-height: 1.35;
+      letter-spacing: 0;
+      color: #243447;
+    }
+
+    p {
+      margin: 0 0 13px;
+    }
+
+    .meta {
+      display: grid;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      gap: 10px;
+      margin-top: 18px;
+    }
+
+    .metric {
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      padding: 12px 14px;
+      background: #ffffff;
+    }
+
+    .metric b {
+      display: block;
+      margin-bottom: 4px;
+      font-size: 13px;
+      color: var(--muted);
+      font-weight: 600;
+    }
+
+    .metric span {
+      font-size: 16px;
+      font-weight: 700;
+    }
+
+    .grid-2 {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+      gap: 20px;
+      align-items: start;
+    }
+
+    .note,
+    .work-card {
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: var(--panel);
+      padding: 18px 20px;
+    }
+
+    .note strong {
+      color: var(--accent-strong);
+    }
+
+    .rail-figure {
+      margin: 18px 0 12px;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      overflow: hidden;
+      background: #ffffff;
+    }
+
+    .rail-figure img {
+      display: block;
+      width: 100%;
+      height: auto;
+    }
+
+    .caption {
+      margin: 0;
+      padding: 10px 14px;
+      color: var(--muted);
+      font-size: 13px;
+      border-top: 1px solid var(--line);
+      background: #fbfcfe;
+    }
+
+    .legend {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 10px;
+      margin-top: 14px;
+    }
+
+    .legend-item {
+      display: flex;
+      align-items: center;
+      gap: 9px;
+      min-height: 44px;
+      padding: 10px 12px;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: #ffffff;
+      font-size: 14px;
+    }
+
+    .swatch {
+      width: 34px;
+      height: 6px;
+      border-radius: 99px;
+      flex: 0 0 auto;
+    }
+
+    .swatch.black {
+      background: #111827;
+    }
+
+    .swatch.yellow {
+      background: #f2c94c;
+    }
+
+    .swatch.orange {
+      background: repeating-linear-gradient(90deg, #e67e22 0 10px, transparent 10px 15px);
+      border: 1px solid #e67e22;
+    }
+
+    .phase-list,
+    .question-list,
+    .criteria-list {
+      margin: 0;
+      padding-left: 22px;
+    }
+
+    .phase-list li,
+    .question-list li,
+    .criteria-list li {
+      margin: 8px 0;
+    }
+
+    .timeline {
+      display: grid;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      gap: 10px;
+      margin-top: 16px;
+    }
+
+    .step {
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      padding: 13px 14px;
+      background: #ffffff;
+    }
+
+    .step b {
+      display: block;
+      margin-bottom: 5px;
+      font-size: 13px;
+      color: var(--blue);
+    }
+
+    .step span {
+      display: block;
+      color: var(--muted);
+      font-size: 14px;
+      line-height: 1.55;
+    }
+
+    .tag-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      margin: 10px 0 0;
+    }
+
+    .tag {
+      display: inline-flex;
+      align-items: center;
+      min-height: 28px;
+      padding: 3px 9px;
+      border-radius: 999px;
+      background: #eef5fb;
+      color: #184e77;
+      font-size: 13px;
+      font-weight: 600;
+    }
+
+    .warn {
+      color: var(--red);
+      font-weight: 700;
+    }
+
+    .ok {
+      color: var(--green);
+      font-weight: 700;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-top: 12px;
+      font-size: 14px;
+    }
+
+    th,
+    td {
+      border: 1px solid var(--line);
+      padding: 10px 12px;
+      text-align: left;
+      vertical-align: top;
+    }
+
+    th {
+      background: #f3f6fa;
+      color: #243447;
+      font-weight: 700;
+    }
+
+    td:last-child {
+      color: var(--muted);
+    }
+
+    code {
+      padding: 1px 5px;
+      border-radius: 5px;
+      background: #edf2f7;
+      color: #243447;
+      font-family: Consolas, "Courier New", monospace;
+      font-size: 0.95em;
+    }
+
+    .footer-note {
+      margin-top: 30px;
+      padding-top: 18px;
+      border-top: 1px solid var(--line);
+      color: var(--muted);
+      font-size: 13px;
+    }
+
+    @media (max-width: 860px) {
+      header,
+      main {
+        padding-left: 22px;
+        padding-right: 22px;
+      }
+
+      .meta,
+      .grid-2,
+      .legend,
+      .timeline {
+        grid-template-columns: 1fr;
+      }
+
+      h1 {
+        font-size: 24px;
+      }
+    }
+
+    @media print {
+      body {
+        background: #ffffff;
+      }
+
+      .page {
+        box-shadow: none;
+        max-width: none;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="page">
+    <header>
+      <h1>C17G1 到 XW3G 候选调车流程汇报</h1>
+      <p class="answer">当前闭环以 C17G1 到 XW3G 为候选调车路径，重点展示故障车远程接管后，先建立并锁闭调车进路，再由道岔导向完成低速转线，最终进入目标区段并停车。现阶段重点是流程和状态联动，严格联锁规则作为后续数据化深化内容。</p>
+      <div class="meta">
+        <div class="metric"><b>当前路径</b><span>C17G1 → 咽喉区 → XW3G</span></div>
+        <div class="metric"><b>当前性质</b><span>候选演示进路</span></div>
+        <div class="metric"><b>仿真重点</b><span>接管、进路、换线、停车</span></div>
+        <div class="metric"><b>下一步关键</b><span>咨询确认进路表</span></div>
+      </div>
+    </header>
+
+    <main>
+      <section>
+        <h2>一、已完成工作梳理</h2>
+        <div class="grid-2">
+          <div class="work-card">
+            <h3>已完成内容</h3>
+            <p>当前工作已经从早期抽象线路，推进到结合真实信号平面图选择候选子场景。DMI 原型的业务主线已经明确：故障停车后由地面远程接管，办理调车进路，列车低速通过咽喉区并进入目标区段停车。</p>
+            <p>图纸中的 <code>C17G1</code>、<code>XW3G</code>、<code>XC/SC/XW</code> 等代号已经纳入后续展示对象，避免继续使用完全虚构的股道和道岔名称。</p>
+          </div>
+          <div class="work-card">
+            <h3>当前仿真边界</h3>
+            <p>本阶段定位为展示型仿真，不等同于真实联锁系统。第一版重点不是还原全部工程条件，而是把接管、进路、道岔、信号、速度和停车这些状态联动起来。</p>
+            <p>咽喉区中间细节暂用 <code>THROAT_1</code> 和 <code>THROAT_2</code> 承接。它们是汇报和开发中的临时占位，后续由真实轨道电路区段和道岔表替换。</p>
+          </div>
+        </div>
+        <div class="tag-row">
+          <span class="tag">图纸代号已引入</span>
+          <span class="tag">局部路径已抽取</span>
+          <span class="tag">候选路径已截图</span>
+          <span class="tag">调车流程已成文档</span>
+          <span class="tag">核心问题已收束</span>
+        </div>
+      </section>
+
+      <section>
+        <h2>二、结合高亮图解释候选路径</h2>
+        <p>下图用于说明当前候选路径的展示逻辑。它不是最终联锁图，也不是完整站场拓扑；图中的重点是让调车过程可视化：列车从 <code>C17G1</code> 出发，进入咽喉区，经道岔导向后进入 <code>XW3G</code>。真实区段和道岔编号仍以咨询结果为准。</p>
+
+        <figure class="rail-figure">
+          <img src="c17g1_xw3g_annotated_throat.png" alt="C17G1 到 XW3G 候选调车路径和咽喉区标注图">
+          <figcaption class="caption">图片文件：C:\Users\59693\Desktop\设计院\实践项目\c17g1_xw3g_annotated_throat.png</figcaption>
+        </figure>
+
+        <div class="legend">
+          <div class="legend-item"><span class="swatch black"></span><span><strong>黑色实线</strong>：从 DWG 解析出的轨道几何线。</span></div>
+          <div class="legend-item"><span class="swatch yellow"></span><span><strong>黄色高亮</strong>：当前候选进路中可落在轨道线上的部分。</span></div>
+          <div class="legend-item"><span class="swatch orange"></span><span><strong>橙色虚线</strong>：图面上可推断但尚未被进路表确认的连接段。</span></div>
+        </div>
+
+        <h3>为什么之前看起来“不沿黑线走”</h3>
+        <p>原因在于咽喉区被抽象成连续候选路径时，部分连接关系还没有正式进路表支撑。轨道图上的黑线只是几何对象；真正能不能走，要看道岔开向、轨道电路划分、信号防护和敌对进路条件。图中能直接贴合轨道几何的部分用黄色，未确认连接只用橙色虚线，避免把推断路径说成已确认线路。</p>
+
+        <h3>列车是怎样完成跨线的</h3>
+        <p>列车不会主动横向移动，轨道本身也不会整体改变。真实动作发生在列车启动之前：联锁系统先检查进路条件，随后把咽喉区相关道岔转换到指定位置并锁闭。列车低速前进时，轮对经过尖轨和辙叉区域，被钢轨几何导向另一条线路。仿真动画应表达这个顺序，而不是表现成“列车图标横跳”。</p>
+
+        <div class="timeline">
+          <div class="step"><b>1. C17G1 占用</b><span>故障车停在起点。DMI 显示速度 0、制动保持、进路未建立。</span></div>
+          <div class="step"><b>2. 进路请求</b><span>远程端申请 <code>R_C17G1_XW3G</code>，图上候选路径进入待确认或请求状态。</span></div>
+          <div class="step"><b>3. 道岔锁闭</b><span>咽喉区道岔组按目标方向转换。仿真中先显示为“反位/定位组合锁闭”。</span></div>
+          <div class="step"><b>4. 低速调车</b><span>列车沿锁闭进路前进，占用从 <code>C17G1</code> 转移到 <code>THROAT_1</code>。</span></div>
+          <div class="step"><b>5. 咽喉后段</b><span><code>THROAT_2</code> 暂作为待确认段处理。具体应显示哪一段轨道电路、哪些道岔位置，列入末尾问题。</span></div>
+          <div class="step"><b>6. 进入 XW3G</b><span>目标区段占用，咽喉区逐步出清。DMI 的目标距离继续下降。</span></div>
+          <div class="step"><b>7. 制动停车</b><span>接近目标停车点后触发制动，速度降到 0，停车位置落在 <code>XW3G</code> 内。</span></div>
+          <div class="step"><b>8. 进路解锁</b><span>停车确认后关闭信号、释放进路。演示闭环结束。</span></div>
+        </div>
+      </section>
+
+      <section>
+        <h2>三、当前闭环必须掌握的业务逻辑</h2>
+        <p>这条主线可以用一句话串起来：列车停在 <code>C17G1</code> 后，远程端取得控制权，但控制权本身不等于可以开车；开车前必须先有调车进路。进路建立后，道岔按要求转换并锁闭，调车信号开放，列车才以调车限速进入进路内方。</p>
+        <p>进入咽喉区以后，展示重点不是“车跨过去”，而是“占用顺序在变化”。DMI 应看到列车从起点区段占用，转为咽喉入口占用，再转为咽喉后段或目标前区段占用，最后进入 <code>XW3G</code>。停车完成后，信号关闭，进路释放。这个顺序就是当前仿真必须讲清楚的专业主线。</p>
+
+        <div class="timeline">
+          <div class="step"><b>1. 故障停车</b><span>确认列车当前占用区段、速度为 0、制动保持。</span></div>
+          <div class="step"><b>2. 远程接管</b><span>控制权切换到地面远程端，但列车仍保持停车。</span></div>
+          <div class="step"><b>3. 请求进路</b><span>申请 <code>C17G1 → XW3G</code> 调车进路，等待条件检查。</span></div>
+          <div class="step"><b>4. 联锁检查</b><span>目标空闲、道岔可转换、无冲突进路、信号可开放。</span></div>
+          <div class="step"><b>5. 道岔锁闭</b><span>道岔转换到指定位置，锁闭后保持进路方向。</span></div>
+          <div class="step"><b>6. 信号开放</b><span>调车信号给出允许，列车可以低速进入进路。</span></div>
+          <div class="step"><b>7. 转线运行</b><span>列车沿锁闭进路通过咽喉区，占用区段顺序转移。</span></div>
+          <div class="step"><b>8. 停车解锁</b><span>进入目标区段并停车，作业确认后关闭信号、解锁进路。</span></div>
+        </div>
+      </section>
+
+      <section>
+        <h2>四、当前代码缺口与实现落点</h2>
+        <p>现有 MATLAB 原型已经具备速度变化、目标距离递减、事件文本、基础状态机和抽象线路显示。主要不足集中在真实对象替换、拓扑数据结构、进路检查和图形路径联动上。下一步实现不需要先做完整联锁系统，但需要让每个显示状态都有明确的数据来源。</p>
+        <table>
+          <thead>
+            <tr>
+              <th style="width: 170px;">环节</th>
+              <th>当前状态</th>
+              <th>主要缺口</th>
+              <th>需要的信息支持</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td>故障停车</td>
+              <td>已有速度 0、制动保持、事件提示。</td>
+              <td>仍使用 <code>A股道</code> 作为起点表达。</td>
+              <td>确认 <code>C17G1</code> 是否可作为初始停车/占用区段。</td>
+            </tr>
+            <tr>
+              <td>远程接管</td>
+              <td>已有“接管/调车”类状态文本。</td>
+              <td>缺少控制权切换前后的清晰字段。</td>
+              <td>确认界面应显示“远程接管”“人控/机控”还是其他专业表述。</td>
+            </tr>
+            <tr>
+              <td>请求调车进路</td>
+              <td>已有请求阶段，但内容仍是 <code>A股道至B股道</code>。</td>
+              <td>缺少进路编号、始端信号、终端对象。</td>
+              <td>确认 <code>R_C17G1_XW3G</code> 是否成立，以及始端调车信号机名称。</td>
+            </tr>
+            <tr>
+              <td>联锁条件检查</td>
+              <td>目前是定时自动跳过。</td>
+              <td>缺少检查项展示：目标空闲、道岔可转、无敌对进路。</td>
+              <td>至少需要目标区段、道岔组、敌对进路是否可简化处理的结论。</td>
+            </tr>
+            <tr>
+              <td>道岔转换并锁闭</td>
+              <td>已有 <code>定位/转换中/反位锁闭</code> 文本。</td>
+              <td>没有具体道岔编号，也没有在图上显示道岔开向。</td>
+              <td>需要中间道岔编号和每组道岔定位/反位要求。</td>
+            </tr>
+            <tr>
+              <td>调车信号开放</td>
+              <td>已有抽象信号颜色。</td>
+              <td>没有对应真实信号机。</td>
+              <td>需要确认显示 <code>XC17</code>、<code>SCF17</code>、<code>XCF17</code> 或其他信号机。</td>
+            </tr>
+            <tr>
+              <td>低速调车运行</td>
+              <td>已有单质点动力学、速度和目标距离变化。</td>
+              <td>速度控制与线路区段占用没有严密绑定。</td>
+              <td>需要确认调车限速取值，例如 <code>40 km/h</code> 是否合适。</td>
+            </tr>
+            <tr>
+              <td>经咽喉区转线</td>
+              <td>已有抽象斜线和候选高亮图。</td>
+              <td>代码中的列车还没有沿真实候选折线移动。</td>
+              <td>需要确认 <code>THROAT_1/THROAT_2</code> 对应的真实轨道电路区段。</td>
+            </tr>
+            <tr>
+              <td>进入目标区段</td>
+              <td>已有“目标股道”阶段。</td>
+              <td>仍写作 <code>B股道</code>，未替换为 <code>XW3G</code>。</td>
+              <td>确认 <code>XW3G</code> 是否可作为目标停车区段。</td>
+            </tr>
+            <tr>
+              <td>制动停车与解锁</td>
+              <td>已有制动减速和流程结束。</td>
+              <td>缺少信号关闭、道岔解锁、进路解锁的独立状态。</td>
+              <td>需要确认停车目标点和是否要求表现分段解锁。</td>
+            </tr>
+          </tbody>
+        </table>
+      </section>
+
+      <section>
+        <h2>五、第一版实现方式与验收口径</h2>
+        <p>第一版实现目标是把候选调车任务按列控逻辑完整演示出来。当前采用方式为：图纸提供真实代号和局部线路参考，运行时使用结构化拓扑数据驱动 DMI，而不是直接读取整张图纸。这样既能保留真实对象，又能控制开发复杂度。</p>
+        <ol class="criteria-list">
+          <li>把代码里的 <code>A股道 / 道岔区 / B股道</code> 替换为 <code>C17G1 / THROAT_1 / THROAT_2 / XW3G</code>。</li>
+          <li>建立最小拓扑数据：区段、线段、候选进路顺序、始端信号、目标停车点。</li>
+          <li>DMI 图上区分非进路线、候选进路线、锁闭进路线和列车占用区段。</li>
+          <li>列车移动沿轨道折线插值，不出现视觉上的横向跳线。</li>
+          <li>状态序列按故障停车、远程接管、进路请求、联锁检查、道岔锁闭、信号开放、低速转线、目标停车、进路解锁推进。</li>
+          <li>速度、目标距离、公里标、制动状态与图上位置联动。</li>
+        </ol>
+      </section>
+
+      <section>
+        <h2>六、当前 MATLAB 程序启动方式</h2>
+        <p>当前可以启动的 MATLAB 原型仍位于旧任务目录，适合展示 DMI 界面、速度/距离联动和远程调车流程雏形。需要注意的是，程序内容尚未完全替换为 <code>C17G1 → THROAT_1 → THROAT_2 → XW3G</code> 主线，代码中仍有 <code>A股道</code>、<code>B股道</code>、<code>S1道岔</code> 等早期抽象名称。</p>
+        <table>
+          <thead>
+            <tr>
+              <th style="width: 160px;">项目</th>
+              <th>位置或命令</th>
+              <th>说明</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td>程序目录</td>
+              <td><code>C:\Users\59693\Documents\Codex\2026-07-12\c-users-59693-desktop-ro-md</code></td>
+              <td>当前可启动版本所在目录。</td>
+            </tr>
+            <tr>
+              <td>主界面文件</td>
+              <td><code>RemoteDMIApp.m</code></td>
+              <td>DMI/HMI 主界面、按钮交互和演示状态机。</td>
+            </tr>
+            <tr>
+              <td>动力学文件</td>
+              <td><code>MinimalTrainPlant.m</code></td>
+              <td>负责速度、位置、加速度和目标距离变化。</td>
+            </tr>
+            <tr>
+              <td>推荐启动脚本</td>
+              <td><code>launch_RemoteDMIApp.m</code></td>
+              <td>用于切换到正确目录并避免加载旧 <code>outputs</code> 版本。</td>
+            </tr>
+            <tr>
+              <td>MATLAB 启动命令</td>
+              <td><code>run('C:\Users\59693\Documents\Codex\2026-07-12\c-users-59693-desktop-ro-md\launch_RemoteDMIApp.m')</code></td>
+              <td>打开 MATLAB 后在命令行执行。</td>
+            </tr>
+          </tbody>
+        </table>
+        <p>界面打开后，点击右侧 <code>启动</code> 开始动态演示；再次点击可暂停。当前演示顺序为：故障停车、远程接管、请求进路、道岔锁闭、低速调车、通过道岔、目标股道、换线完成。后续开发应把这条早期抽象流程替换为当前候选路径流程。</p>
+      </section>
+
+      <section>
+        <h2>七、当前必须确认的问题</h2>
+        <p>以下问题用于当前咨询确认。它们直接决定第一版仿真的起点、终点、路径、信号对象和停车目标。</p>
+        <table>
+          <thead>
+            <tr>
+              <th style="width: 70px;">序号</th>
+              <th>必问问题</th>
+              <th>为什么必须问</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td>1</td>
+              <td><code>C17G1 → XW3G</code> 是否能作为一个合理的调车演示方向？</td>
+              <td>决定当前候选路径能否继续作为主场景。</td>
+            </tr>
+            <tr>
+              <td>2</td>
+              <td><code>C17G1</code> 能否设为故障列车初始停车或占用区段？</td>
+              <td>决定仿真起点是否贴合实际作业语境。</td>
+            </tr>
+            <tr>
+              <td>3</td>
+              <td><code>XW3G</code> 能否设为目标线、检修线或最终停车区段？</td>
+              <td>决定“调入目标股道”的业务叙述是否成立。</td>
+            </tr>
+            <tr>
+              <td>4</td>
+              <td>始端调车信号机应该显示哪个，例如 <code>XC17</code>、<code>SCF17</code>、<code>XCF17</code> 或其他？</td>
+              <td>DMI 不能只写“信号开放”，最好能指向具体信号对象。</td>
+            </tr>
+            <tr>
+              <td>5</td>
+              <td>这条路径是否必须经过红框所示咽喉道岔区？</td>
+              <td>如果答案为是，换线动画就是汇报重点；如果不是，路径需要重选。</td>
+            </tr>
+            <tr>
+              <td>6</td>
+              <td>调车限速在仿真里取 <code>40 km/h</code> 是否可以接受？</td>
+              <td>影响速度表、限速提示和超速制动阈值。</td>
+            </tr>
+            <tr>
+              <td>7</td>
+              <td>停车目标应放在 <code>XW3G</code> 内、<code>XW3</code> 信号机前、车挡前，还是绝缘节前？</td>
+              <td>决定目标距离归零点和制动曲线终点。</td>
+            </tr>
+          </tbody>
+        </table>
+      </section>
+
+      <section>
+        <h2>八、深化问题</h2>
+        <p>以下问题用于后续深化。它们不一定阻塞第一版演示，但会影响第二版是否能够接近真实工程数据表达。</p>
+        <table>
+          <thead>
+            <tr>
+              <th style="width: 70px;">序号</th>
+              <th>深化问题</th>
+              <th>第一版处理方法</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td>1</td>
+              <td>中间实际经过哪些轨道电路区段？</td>
+              <td>先用 <code>THROAT_1</code>、<code>THROAT_2</code> 抽象，占用顺序保持真实逻辑。</td>
+            </tr>
+            <tr>
+              <td>2</td>
+              <td>中间经过哪些道岔，每组道岔定位还是反位？</td>
+              <td>先显示“咽喉道岔组转换并锁闭”，确认后拆成具体编号。</td>
+            </tr>
+            <tr>
+              <td>3</td>
+              <td>有哪些敌对进路，以及哪些信号需要防护关闭？</td>
+              <td>第一版显示“敌对进路检查通过”，不伪造完整联锁表。</td>
+            </tr>
+            <tr>
+              <td>4</td>
+              <td>是否需要分段解锁、接近锁闭或保护区段？</td>
+              <td>先做“进路锁闭 → 停车后解锁”，第二版再加分段逻辑。</td>
+            </tr>
+            <tr>
+              <td>5</td>
+              <td>汇报口径应偏“故障车回库检修”，还是“车场内换线避让”？</td>
+              <td>先按故障车远程接管后调入目标线讲，确认后统一界面文案。</td>
+            </tr>
+            <tr>
+              <td>6</td>
+              <td>项目验收更看重 DMI 外观逼真，还是流程与状态联动？</td>
+              <td>如果时间有限，我优先保证状态联动，因为它更能说明列控逻辑。</td>
+            </tr>
+          </tbody>
+        </table>
+
+        <p class="footer-note">当前结论标记：<span class="ok">可作为仿真候选路径</span>；真实工程结论标记：<span class="warn">待进路表、拓扑表、道岔位置和敌对进路确认</span>。本页引用的高亮图与 HTML 位于同一目录，可直接用浏览器打开预览。</p>
+      </section>
+    </main>
+  </div>
+</body>
+</html>
