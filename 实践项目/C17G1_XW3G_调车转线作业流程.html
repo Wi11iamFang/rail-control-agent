@@ -1,0 +1,634 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>列车调车转线作业流程<br>——经由咽喉区的调车转线作业（C17G1 → XW3G）</title>
+  <style>
+    :root {
+      --ink: #1f2933;
+      --muted: #5f6b7a;
+      --line: #d7dde5;
+      --panel: #f7f9fc;
+      --accent: #b7791f;
+      --accent-strong: #975a16;
+      --blue: #1f5f99;
+      --blue-soft: #e8f0fa;
+      --green: #287a4b;
+      --red: #b83232;
+      --white: #ffffff;
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      color: var(--ink);
+      background: #eef2f6;
+      font-family: "Microsoft YaHei", "Segoe UI", Arial, sans-serif;
+      line-height: 1.68;
+    }
+
+    .page {
+      max-width: 1120px;
+      margin: 0 auto;
+      background: var(--white);
+      min-height: 100vh;
+      box-shadow: 0 24px 80px rgba(15, 23, 42, 0.12);
+    }
+
+    header {
+      padding: 34px 46px 24px;
+      border-bottom: 1px solid var(--line);
+      background: linear-gradient(180deg, #ffffff 0%, #f8fafc 100%);
+    }
+
+    h1 {
+      margin: 0 0 12px;
+      font-size: 29px;
+      line-height: 1.25;
+      letter-spacing: 0;
+    }
+
+    h1 small {
+      display: block;
+      font-size: 19px;
+      font-weight: 600;
+      color: var(--blue);
+      margin-top: 6px;
+    }
+
+    .answer {
+      max-width: 980px;
+      margin: 0;
+      padding-left: 16px;
+      border-left: 4px solid var(--accent);
+      font-size: 16.5px;
+      font-weight: 600;
+    }
+
+    main { padding: 30px 46px 58px; }
+
+    section { margin-top: 38px; }
+
+    h2 {
+      margin: 0 0 16px;
+      font-size: 23px;
+      line-height: 1.35;
+      color: #182431;
+      border-bottom: 2px solid var(--line);
+      padding-bottom: 8px;
+    }
+
+    h3 {
+      margin: 24px 0 10px;
+      font-size: 18px;
+      color: #24313f;
+    }
+
+    p { margin: 0 0 12px; }
+
+    .legend {
+      display: inline-flex;
+      flex-wrap: wrap;
+      gap: 18px;
+      align-items: center;
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      padding: 10px 16px;
+      margin: 4px 0 18px;
+      font-size: 14px;
+      color: var(--muted);
+    }
+
+    .legend span { display: inline-flex; align-items: center; gap: 6px; }
+
+    .swatch { width: 26px; height: 5px; display: inline-block; border-radius: 2px; }
+    .swatch.thin { height: 3px; }
+    .swatch.black { background: #37474f; }
+    .swatch.yellow { background: #e8a20c; }
+    .swatch.dashed {
+      background: repeating-linear-gradient(90deg, #e8a20c 0 6px, transparent 6px 11px);
+      border-radius: 0; height: 3px;
+    }
+
+    .stage {
+      border: 1px solid var(--line);
+      border-radius: 10px;
+      padding: 20px 22px 18px;
+      margin-bottom: 26px;
+      background: var(--white);
+      box-shadow: 0 2px 10px rgba(15, 23, 42, 0.05);
+    }
+
+    .stage-top {
+      display: flex;
+      align-items: baseline;
+      gap: 12px;
+      margin-bottom: 12px;
+      flex-wrap: wrap;
+    }
+
+    .phase-badge {
+      background: var(--blue);
+      color: #fff;
+      font-size: 15px;
+      font-weight: 700;
+      padding: 3px 12px;
+      border-radius: 20px;
+      white-space: nowrap;
+    }
+
+    .phase-badge.exec { background: var(--green); }
+    .phase-badge.pre { background: var(--accent-strong); }
+
+    .state-tags {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      margin-bottom: 14px;
+    }
+
+    .state-tag {
+      background: var(--blue-soft);
+      color: var(--blue);
+      border: 1px solid #c9dcef;
+      padding: 2px 10px;
+      border-radius: 6px;
+      font-size: 13px;
+      font-weight: 600;
+    }
+
+    .state-tag.green { background: #e5f3ea; color: var(--green); border-color: #bcd9c5; }
+
+    .stage figure {
+      margin: 0 0 14px;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      overflow: hidden;
+      background: #fbfcfe;
+      text-align: center;
+    }
+
+    .stage figure img {
+      width: 100%;
+      max-height: 560px;
+      display: block;
+      object-fit: contain;
+      background: #fbfcfe;
+    }
+
+    .fig-cap {
+      font-size: 13px;
+      color: var(--muted);
+      padding: 8px 14px;
+      border-top: 1px solid var(--line);
+      text-align: left;
+      background: var(--panel);
+    }
+
+    .desc ul {
+      margin: 0 0 0 18px;
+      padding: 0;
+    }
+
+    .desc li { margin-bottom: 6px; }
+
+    .note {
+      background: var(--panel);
+      border-left: 3px solid var(--accent);
+      padding: 10px 14px;
+      margin-top: 12px;
+      font-size: 14.5px;
+      color: #3d4a57;
+      border-radius: 0 6px 6px 0;
+    }
+
+    .keyline {
+      background: #fff8ec;
+      border-left: 3px solid var(--accent-strong);
+      padding: 12px 16px;
+      margin: 18px 0;
+      border-radius: 0 6px 6px 0;
+      font-size: 15.5px;
+      font-weight: 600;
+      color: #6b4a10;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin: 12px 0 6px;
+      font-size: 14.5px;
+    }
+
+    th, td {
+      border: 1px solid var(--line);
+      padding: 8px 12px;
+      text-align: left;
+      vertical-align: top;
+    }
+
+    th { background: var(--panel); color: #253543; font-weight: 700; }
+
+    /* References section */
+    .refs {
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-radius: 10px;
+      padding: 6px 20px 16px;
+      margin-top: 22px;
+    }
+
+    .refs ol {
+      counter-reset: ref;
+      list-style: none;
+      margin: 0;
+      padding: 0;
+    }
+
+    .refs li {
+      counter-increment: ref;
+      position: relative;
+      padding: 10px 0 10px 40px;
+      border-bottom: 1px dashed var(--line);
+      font-size: 14.5px;
+    }
+
+    .refs li:last-child { border-bottom: none; }
+
+    .refs li::before {
+      content: "[" counter(ref) "]";
+      position: absolute;
+      left: 0;
+      top: 10px;
+      color: var(--blue);
+      font-weight: 700;
+    }
+
+    .refs .src {
+      color: var(--muted);
+      font-size: 13px;
+      display: block;
+      margin-top: 3px;
+    }
+
+    .mapping-table th:first-child { width: 22%; }
+
+    footer {
+      padding: 18px 46px 30px;
+      color: var(--muted);
+      font-size: 13.5px;
+      border-top: 1px solid var(--line);
+      background: #fafbfd;
+    }
+
+    code {
+      background: #eef1f5;
+      padding: 1px 6px;
+      border-radius: 4px;
+      font-family: Consolas, "Courier New", monospace;
+      font-size: 13px;
+      color: #2b3a48;
+    }
+  </style>
+</head>
+<body>
+<div class="page">
+  <header>
+    <h1>列车调车转线作业流程详解
+      <small>故障列车远程接管 · 经由咽喉区的调车转线作业（C17G1 → XW3G）</small>
+    </h1>
+    <p class="answer">本阶段属于<strong>调车进路建立后的调车运行过程</strong>：列车在调车信号允许后低速启动，压入进路内方，经由咽喉区锁闭道岔完成转线，轨道电路占用由起点区段逐步转移至目标区段。当前仿真将咽喉区暂抽象为两个待确认区段（<code>THROAT_1/THROAT_2</code>），仅作拓扑占位，后续由真实进路表和轨道电路编号替换。</p>
+  </header>
+
+  <main>
+
+    <!-- 全景 -->
+    <section>
+      <h2>一、候选进路全景与图例</h2>
+      <p>候选调车进路为 <code>R_C17G1_XW3G</code>：从 <code>C17G1</code> 存车/检修线，经咽喉道岔区进入 <code>XW3G</code>。图中黑色线为从 DWG 图纸解析的钢轨几何，黄色为候选进路段，橙色虚线为未经正式进路表核实的连接。</p>
+      <div class="legend">
+        <span><i class="swatch thin black"></i> 钢轨线（DWG 解析）</span>
+        <span><i class="swatch yellow"></i> 候选进路段</span>
+        <span><i class="swatch dashed"></i> 未经进路表核实的连接</span>
+      </div>
+
+      <figure>
+        <img src="cfg_figures/overview_small.png" alt="C17G1 到 XW3G 候选调车路径全景与咽喉区标注">
+        <figcaption class="fig-cap">图 1 · 候选进路全景：<code>C17G1</code>（起点）— 咽喉区（<code>THROAT_1</code> 临时区段、<code>THROAT_2</code> 待确认段）— <code>XW3G</code>（目标）。咽喉区两根标注仅表示拓扑占位，不代表真实轨道电路编号。</figcaption>
+      </figure>
+
+      <h3>图 2~12 与图 1 的抽象关系</h3>
+      <div class="keyline">图 1 保留 DWG 解析后的原始线路几何和候选路径位置，用于说明 <code>C17G1</code>、咽喉区、<code>XW3G</code> 在真实站场图中的相对关系；图 2~12 不是对图 1 的局部放大或 CAD 复原，而是面向 DMI/RO 动画展示抽取出的<strong>流程拓扑示意图</strong>。</div>
+      <table>
+        <tr><th>抽象对象</th><th>来自图 1 的依据</th><th>在阶段图中的表达</th></tr>
+        <tr><td><code>C17G1</code></td><td>候选起点/故障停车区段</td><td>显示列车初始占用、控制权交接、低速启动</td></tr>
+        <tr><td>咽喉区</td><td>候选路径进入道岔密集区并发生线路导向</td><td>简化为 <code>THROAT_1</code> 与 <code>THROAT_2</code> 两个临时拓扑段，突出道岔锁闭、占用转移和导向转线</td></tr>
+        <tr><td><code>XW3G</code></td><td>候选目标轨道区段</td><td>显示目标区段占用、目标距离递减、制动停车和进路解锁</td></tr>
+        <tr><td>运行方向</td><td>按候选流程暂定为 <code>C17G1 → XW3G</code></td><td>统一用单向箭头标注，不再使用容易误读为道岔开向的 Y 形符号；真实方向仍需结合进路表确认</td></tr>
+      </table>
+      <p>因此，阶段图保留的是业务逻辑关系：进路请求、道岔转换锁闭、调车信号开放、车列进入进路内方、轨道电路占用顺序转移、经锁闭道岔导向目标线、停车确认与进路解锁。其目的不是证明真实道岔编号和轨道电路编号已经确定，而是为后续 DMI 动画和状态机建立一个可替换的数据骨架。</p>
+
+      <h3>术语先分清</h3>
+      <table>
+        <tr><th>术语</th><th>含义</th><th>对应本项目</th></tr>
+        <tr><td>调车作业</td><td>车列在站内/段所内不载客的移动、编组、转线等作业，速度低、距离短</td><td>整个仿真场景</td></tr>
+        <tr><td>调车进路</td><td>联锁为一次调车作业办理的、从始端调车信号机到终端的固定路径，含道岔位置、区段、敌对条件</td><td><code>R_C17G1_XW3G</code></td></tr>
+        <tr><td>转线作业</td><td>调车作业的一种：车列从一条线（股道/存车线）经咽喉区道岔进入另一条线</td><td><code>C17G1 → 咽喉区 → XW3G</code></td></tr>
+      </table>
+
+      <div class="keyline">推荐专业表述：主表述为<strong>调车进路建立后的调车运行阶段</strong>；强调换线称<strong>经由咽喉区的调车转线作业</strong>；站在联锁/信号系统角度称<strong>调车进路占用通过阶段</strong>。<code>THROAT_1/THROAT_2</code> 只是临时区段占位，不应作为流程阶段名。</div>
+    </section>
+
+    <!-- 前置阶段 -->
+    <section>
+      <h2>二、前置阶段（运行前完成）</h2>
+
+      <div class="stage">
+        <div class="stage-top">
+          <span class="phase-badge pre">前置 1</span>
+          <h3 style="margin:0;font-size:18px;">故障停车与控制权交接（远程接管）</h3>
+        </div>
+        <div class="state-tags">
+          <span class="state-tag">C17G1 占用</span>
+          <span class="state-tag">ATP 保持制动</span>
+          <span class="state-tag">控制权：车载/本地 → 地面远程</span>
+        </div>
+        <figure>
+          <img src="cfg_figures/stage_01_fault_stop.png" alt="故障列车停在 C17G1 起点处，准备远程接管">
+          <figcaption class="fig-cap">图 2 · 故障列车停在 <code>C17G1</code> 起点区段，起点区段显示占用，车载 ATO 退出、ATP 保持制动，地面远程端准备接管。该图保留完整候选进路轮廓，避免只放大局部起点。</figcaption>
+        </figure>
+        <div class="desc">
+          <p>故障列车迫停于 <code>C17G1</code>。地面操作员申请接管，控制权由车载自动控制或本地控制切换为地面远程控制；列车仍保持停车，制动不立即缓解。该场景对应行业中的<strong>远程限制模式（RRM）/ 蠕动模式（CAM）</strong>——用于列车因故障迫停区间时，为处理故障争取时间。</p>
+        </div>
+      </div>
+
+      <div class="stage">
+        <div class="stage-top">
+          <span class="phase-badge pre">前置 2</span>
+          <h3 style="margin:0;font-size:18px;">调车进路办理（请求与联锁检查）</h3>
+        </div>
+        <div class="state-tags">
+          <span class="state-tag">进路：请求中 → 联锁检查</span>
+          <span class="state-tag">起点占用 ✓ · 目标空闲 ✓ · 道岔可转换 ✓ · 无敌对进路 ✓</span>
+        </div>
+        <figure>
+          <img src="cfg_figures/stage_02_route_request.png" alt="办理 C17G1 到 XW3G 调车进路，候选路径进入联锁检查">
+          <figcaption class="fig-cap">图 3 · 办理 <code>C17G1 → XW3G</code> 调车进路，候选路径以待确认光带显示。联锁检查：起点列车占用状态、目标区段空闲、咽喉区轨道区段空闲、道岔可转换、无挤岔/失表/锁闭冲突、无敌对进路、防护信号可控、远端通信正常。</figcaption>
+        </figure>
+        <div class="desc">
+          <p>操作员请求办理候选调车进路。联锁逐项检查能否建立进路——重点是<strong>敌对进路</strong>与<strong>防护条件</strong>：人员防护开关状态纳入联锁进路检查，封锁区域禁止办理任何列车/调车进路；已办理进路应立即关闭相应信号。未确认项在仿真中显示"待确认"，不伪装成真实联锁结果。</p>
+        </div>
+      </div>
+
+      <div class="stage">
+        <div class="stage-top">
+          <span class="phase-badge pre">前置 3</span>
+          <h3 style="margin:0;font-size:18px;">道岔转换与进路锁闭</h3>
+        </div>
+        <div class="state-tags">
+          <span class="state-tag">道岔：未锁闭 → 转换中 → 锁闭</span>
+          <span class="state-tag">进路：锁闭保持</span>
+          <span class="state-tag green">车列仍未启动</span>
+        </div>
+        <figure>
+          <img src="cfg_figures/stage_03_switch_lock.png" alt="咽喉区道岔按进路要求转换并锁闭">
+          <figcaption class="fig-cap">图 4 · 咽喉区道岔按进路要求转换为规定位置（定位/反位）并确认到位后锁闭，锁闭进路以连续光带显示。进路建立后<strong>进路锁闭保持</strong>——锁闭的是"进路"，道岔与该路径上的区段随之锁闭，列车尚未运行。</figcaption>
+        </figure>
+        <div class="desc">
+          <p>咽喉区相关道岔转换到进路要求位置，确认到位后进入锁闭状态。此时列车仍停在 <code>C17G1</code>。道岔位置含义：<strong>定位</strong>为列车沿道岔默认方向运行，<strong>反位</strong>为列车被导向侧线或另一条连接线。仿真中道岔状态可从"未锁闭 → 转换中 → 锁闭"变化，进路保持锁闭显示为黄色。</p>
+        </div>
+      </div>
+
+      <div class="stage">
+        <div class="stage-top">
+          <span class="phase-badge pre">前置 4</span>
+          <h3 style="margin:0;font-size:18px;">调车信号开放，车载转入调车模式</h3>
+        </div>
+        <div class="state-tags">
+          <span class="state-tag">信号：关闭 → 允许调车</span>
+          <span class="state-tag">车载模式：调车（SH）</span>
+          <span class="state-tag">DMI 显示"调车"</span>
+        </div>
+        <figure>
+          <img src="cfg_figures/stage_04_signal_open.png" alt="始端调车信号开放，车载转入调车模式">
+          <figcaption class="fig-cap">图 5 · 始端调车信号机开放，车列获得低速调车移动许可。车载设备转入<strong>调车模式（SH）</strong>，DMI 以"调车"显示该模式；进入后按调车运行规则监控，司机/远程操作员负责安全运行。</figcaption>
+        </figure>
+        <div class="desc">
+          <p>始端调车信号开放后，列车获得低压许可，但受调车限速约束（候选 <code>40 km/h</code>）。车载转入调车模式，此时按调车运行规则进行顶棚限速监控，而非完全监控模式下的连续式一次制动曲线。事件流显示"调车信号开放，允许低速运行"。</p>
+        </div>
+      </div>
+    </section>
+
+    <!-- 运行阶段 -->
+    <section>
+      <h2>三、运行阶段（本次重点：低速调车到进入目标区段）</h2>
+
+      <div class="stage">
+        <div class="stage-top">
+          <span class="phase-badge exec">运行 1</span>
+          <h3 style="margin:0;font-size:18px;">车列进入进路内方（低速启动）</h3>
+        </div>
+        <div class="state-tags">
+          <span class="state-tag">牵引：1 级低速</span>
+          <span class="state-tag">速度：0 → 上升</span>
+          <span class="state-tag">目标距离：开始递减</span>
+        </div>
+        <figure>
+          <img src="cfg_figures/stage_05_enter_route.png" alt="车列从 C17G1 低速启动，压入始端信号机内方">
+          <figcaption class="fig-cap">图 6 · 调车信号开放后，车列低速启动，从 <code>C17G1</code> 压入始端调车信号机内方。图中列车位置已前移，起点和进路入口出现占用光带，进路由"锁闭等待"转入"占用通过"。</figcaption>
+        </figure>
+        <div class="desc">
+          <ul>
+            <li>车列从 <code>C17G1</code> 起动，速度逐步上升，但不得超过调车限速。</li>
+            <li><code>C17G1</code> 仍显示占用，直到列车尾部出清起点区段。</li>
+            <li>目标距离开始递减，车列进入进路内方是"占用通过阶段"的起点。</li>
+          </ul>
+        </div>
+      </div>
+
+      <div class="stage">
+        <div class="stage-top">
+          <span class="phase-badge exec">运行 2</span>
+          <h3 style="margin:0;font-size:18px;">进路锁闭保持（调车进路占用通过）</h3>
+        </div>
+        <div class="state-tags">
+          <span class="state-tag">进路：占用通过（持续锁闭）</span>
+          <span class="state-tag green">道岔不得再转换 · 敌对进路不得办理</span>
+        </div>
+        <figure>
+          <img src="cfg_figures/stage_06_route_lock_hold.png" alt="车列运行中，进路持续保持锁闭">
+          <figcaption class="fig-cap">图 7 · 车列在 <code>C17G1</code> 与咽喉区之间运行时，进路持续保持锁闭。图中单独标出锁闭保持约束：道岔保持既定开向，关联区段不可被其它作业占用，敌对进路不得办理，信号开放条件持续检查。</figcaption>
+        </figure>
+        <div class="desc">
+          <p>运行过程中进路持续保持锁闭，道岔不得再转换、敌对进路不得办理。说明：调车速度低，一般不设接发车进路那样的"接近锁闭"；重点是<strong>进路锁闭保持</strong>与后续<strong>分段解锁</strong>。若需体现联锁深度，可把"接近锁闭或进路锁闭保持"列为待确认项。</p>
+        </div>
+      </div>
+
+      <div class="stage">
+        <div class="stage-top">
+          <span class="phase-badge exec">运行 3</span>
+          <h3 style="margin:0;font-size:18px;">轨道电路占用顺序转移</h3>
+        </div>
+        <div class="state-tags">
+          <span class="state-tag">占用转移：C17G1 → 咽喉区段1 → 咽喉区段2 → XW3G</span>
+          <span class="state-tag">起点出清变灰</span>
+        </div>
+        <figure>
+          <img src="cfg_figures/stage_06_occupancy_transfer.png" alt="轨道电路占用光带由起点区段向咽喉区逐段前移">
+          <figcaption class="fig-cap">图 8 · 占用光带沿运行方向逐区段前移：车列头部进入咽喉区第一个轨道电路区段并显示占用，起点股道区段在车列尾部出清后恢复空闲。这是"<strong>区段占用顺序转移</strong>"的标准含义。</figcaption>
+        </figure>
+        <div class="desc">
+          <p>占用按运行方向逐区段前移：<code>C17G1（占用）→ 咽喉区段1（占用）→ 咽喉区段2（占用）→ XW3G（占用）</code>。DMI 动画应表现占用光带逐段移动，而不是列车图标横向跳线。</p>
+        </div>
+      </div>
+
+      <div class="stage">
+        <div class="stage-top">
+          <span class="phase-badge exec">运行 4</span>
+          <h3 style="margin:0;font-size:18px;">车列通过咽喉区（道岔导向转线）</h3>
+        </div>
+        <div class="state-tags">
+          <span class="state-tag">车列经锁闭道岔尖轨/辙叉通过</span>
+          <span class="state-tag">被钢轨几何导向目标线路</span>
+        </div>
+        <figure>
+          <img src="cfg_figures/stage_07_throat_guidance.png" alt="车列通过咽喉区 THROAT_2，经锁闭道岔被导向 XW3G">
+          <figcaption class="fig-cap">图 9 · 车列通过咽喉区核心段（<code>THROAT_2</code> 待确认段）。车列轮对经过锁闭道岔的尖轨/辙叉，被钢轨几何导向目标线路方向。右下角小图专门说明尖轨开向目标线路、车轮沿弯股通过辙叉的导向关系。</figcaption>
+        </figure>
+        <div class="note">列车不主动跨线，是道岔提前排好进路后，<strong>钢轨把列车导向另一条线</strong>。动画应体现车列沿锁闭进路连续移动，而非横向跳转到另一条线。</div>
+        <div class="desc">
+          <p>咽喉区经道岔弯股的进路通常<strong>不电码化（无码区）</strong>，因此本阶段的安全由"进路锁闭 + 地面调车信号 + 低速限速"共同保证，不依赖机车信号的连续信息。这是调车作业在咽喉区安全的行业性原因。</p>
+        </div>
+      </div>
+
+      <div class="stage">
+        <div class="stage-top">
+          <span class="phase-badge exec">运行 5</span>
+          <h3 style="margin:0;font-size:18px;">进入目标轨道区段 XW3G</h3>
+        </div>
+        <div class="state-tags">
+          <span class="state-tag">当前区段：XW3G（占用）</span>
+          <span class="state-tag">目标区段：XW3G</span>
+          <span class="state-tag">进入目标停车控制</span>
+        </div>
+        <figure>
+          <img src="cfg_figures/stage_08_enter_xw3g.png" alt="车列进入目标区段 XW3G，准备停车">
+          <figcaption class="fig-cap">图 10 · 车列进入目标区段 <code>XW3G</code>，目标区段占用；咽喉区各段随车列出清依次解锁或保持至停车。此时进入目标停车控制：根据停车点（防护点）与安全距离计算制动曲线。</figcaption>
+        </figure>
+        <div class="desc">
+          <p>车列进入 <code>XW3G</code>，占用光带移入目标区段。此时进路仍保持锁闭，等待列车停稳与作业完成。停车点（计算点）设在防护点前适当距离，两者之间为<strong>安全距离</strong>。</p>
+        </div>
+      </div>
+
+      <div class="stage">
+        <div class="stage-top">
+          <span class="phase-badge exec">运行 6</span>
+          <h3 style="margin:0;font-size:18px;">制动停车与进路解锁</h3>
+        </div>
+        <div class="state-tags">
+          <span class="state-tag">制动：常用制动 → 停车</span>
+          <span class="state-tag">信号：关闭</span>
+          <span class="state-tag">进路：解锁（分段/一次）· 道岔：解锁</span>
+        </div>
+        <figure>
+          <img src="cfg_figures/stage_09_braking.png" alt="制动停车于目标点附近，停稳后准备进路解锁">
+          <figcaption class="fig-cap">图 11 · 按目标距离-速度曲线常用制动，车列停稳在 <code>XW3G</code> 目标停车点附近。停稳并确认作业完成后，信号关闭、进路解锁（分段解锁或一次性解锁）、道岔恢复可操作。</figcaption>
+        </figure>
+        <figure>
+          <img src="cfg_figures/stage_10_release.png" alt="停车确认后信号关闭，进路和道岔解锁">
+          <figcaption class="fig-cap">图 12 · 停车确认后，始端调车信号关闭，进路锁闭光带熄灭，除目标占用区段外的进路区段释放，道岔组恢复可操作。第一版可先做一次性解锁，第二版再扩展为分段解锁。</figcaption>
+        </figure>
+        <div class="desc">
+          <ul>
+            <li>按目标距离与制动距离判断触发常用制动，速度逐步下降至 0。</li>
+            <li>停稳后远程操作员确认，调车作业完成，进路解锁。</li>
+          </ul>
+          <div class="note">事件流：<code>C17G1</code> 至 <code>XW3G</code> 调车完成 → 信号关闭 → 进路解锁 → 道岔恢复可操作。至此"调车进路建立后的调车运行阶段"结束。</div>
+        </div>
+      </div>
+    </section>
+
+    <!-- 状态序列 -->
+    <section>
+      <h2>四、业务状态序列与 DMI 联动</h2>
+      <p>第一版可按下列状态驱动界面动画，状态命名已改为<strong>按业务阶段命名</strong>，<code>THROAT_1/THROAT_2</code> 仅保留在拓扑数据中作占位区段。</p>
+      <pre style="background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:14px 18px;font-size:13px;line-height:1.7;overflow:auto;color:#2b3a48;"><code>FAULT_STOPPED → REMOTE_TAKEOVER → SHUNT_ROUTE_REQUESTED → INTERLOCK_CHECKING
+→ SWITCH_MOVING → ROUTE_LOCKED → SHUNT_SIGNAL_OPEN → TRAIN_ENTERED_ROUTE
+→ ROUTE_OCCUPANCY_TRANSFER → THROAT_PASSING → ENTERED_TARGET_TRACK
+→ TARGET_BRAKING → STOP_CONFIRMED → ROUTE_RELEASED</code></pre>
+
+      <h3>阶段配图对照</h3>
+      <table class="mapping-table">
+        <tr><th>业务状态</th><th>配图</th><th>线路图表现</th></tr>
+        <tr><td>故障停车 / 远程接管</td><td>stage_01_fault_stop.png</td><td>C17G1 显示占用，列车停在起点</td></tr>
+        <tr><td>进路办理 / 联锁检查</td><td>stage_02_route_request.png</td><td>候选路径以虚线或待确认颜色显示</td></tr>
+        <tr><td>道岔转换 / 进路锁闭</td><td>stage_03_switch_lock.png</td><td>咽喉道岔组显示定位/反位组合并锁闭</td></tr>
+        <tr><td>调车信号开放</td><td>stage_04_signal_open.png</td><td>始端调车信号允许，进路黄光带保持</td></tr>
+        <tr><td>进入进路内方</td><td>stage_05_enter_route.png</td><td>列车光标越过始端信号机，沿锁闭进路移动</td></tr>
+        <tr><td>进路锁闭保持</td><td>stage_06_route_lock_hold.png</td><td>进路保持锁闭，道岔和区段不允许被其它作业使用</td></tr>
+        <tr><td>占用顺序转移</td><td>stage_06_occupancy_transfer.png</td><td>占用光带逐段前移，起点段出清变灰</td></tr>
+        <tr><td>通过咽喉区（转线）</td><td>stage_07_throat_guidance.png</td><td>列车经锁闭道岔连续移动，道岔区段占用，并显示尖轨/辙叉导向示意</td></tr>
+        <tr><td>进入目标区段</td><td>stage_08_enter_xw3g.png</td><td>光带移入 XW3G，目标距离递减</td></tr>
+        <tr><td>制动停车</td><td>stage_09_braking.png</td><td>目标停车点前触发常用制动</td></tr>
+        <tr><td>停车确认 / 进路解锁</td><td>stage_10_release.png</td><td>信号关闭，黄光带熄灭，道岔恢复可操作</td></tr>
+      </table>
+    </section>
+
+    <!-- 参考文献：资料依据统一在文末，不在流程中逐段展示 -->
+    <section>
+      <h2>五、参考资料（资料依据）</h2>
+      <div class="refs">
+        <ol>
+          <li><strong>CTCS2 教材</strong>——调车模式（SH）与调车防护。
+            <span class="src">源文件：Ctrl+Click 下发资料\CTCS2教材.pdf · 第 18、19、25、32、33、34、43 页。要点：车载 ATP 控制模式含调车模式；"防止机车超过规定速度进行调车作业"；轨道电路/应答器电文含"调车危险"信息；SH（Shunting mode）；咽喉区经道岔弯股进路不电码化（无码区）。</span>
+          </li>
+          <li><strong>C2ATP 司机操作手册（RA_B0114006）</strong>——调车模式操作与限速。
+            <span class="src">源文件：下发资料\RA_B0114006_C2ATP_CASCO_8006_司机操作手册.pdf · 第 24、36、37、77、78、79、108、109 页。要点：调车模式在 DMI 显示"调车"；停车后按"调车"键进入调车模式，负责安全运行、禁改等级、退出转待机再注册；收到禁止调车包（ETCS-132）施紧急制动并提示"禁止调车"；目视/引导模式顶棚限速 40 km/h；机车信号模式 80 km/h。</span>
+          </li>
+          <li><strong>全自动运行系统考察报告（20170509）</strong>——车辆段咽喉区与转线作业场景。
+            <span class="src">源文件：下发资料\关于赴上海、北京调研全自动运行系统的考察报告-20170509.pdf · 第 17、23、27、28 页。要点：车辆段自动驾驶区含出入段线、停车列检棚、洗车棚及咽喉区、试车线；出入段线设转换轨仅用于控制权交接；人员防护开关纳入联锁进路检查，封锁区域禁止办理调车进路；故障列车由救援车人工驾驶救援。</span>
+          </li>
+          <li><strong>城市轨道交通全自动运行系统运营指南（白皮书）</strong>——远程控制运行的行业依据。
+            <span class="src">源文件：下发资料\11-《城市轨道交通全自动运行系统运营指南》白皮书.pdf · 第 9、13 页。要点：远程限制模式（RRM）；列车宜具备蠕动模式（CAM）、远程限制模式（RRM）等远程控制运行功能，以防列车因故障迫停区间；车辆基地全自动运行区域提供自动调车等功能。</span>
+          </li>
+          <li><strong>铁路设计阶段划分及工程设计步骤</strong>——"转线"作为正式作业术语。
+            <span class="src">源文件：下发资料\1-技术培训资料-铁路设计阶段划分及工程设计步骤.pdf · 第 10、13 页。要点：动车段所集中控制系统（CCS）完成出入段（所）、洗刷、专项、<strong>转线</strong>等作业的调度指挥——"转线"是动车段所业务的正式术语。</span>
+          </li>
+          <li><strong>闭塞与列控概论 · 第五讲 安全距离的分析</strong>——停车点与安全距离。
+            <span class="src">源文件：下发资料\闭塞与列控概论\闭塞与列控概论第五讲安全距离的分析.pdf · 第 1~3 页。要点：接车时股道出站信号机处为停车控制防护点，停车点（计算点）设在防护点前适当距离，其间为安全距离；"接车线末端无隔开设备时禁止办理相关调车作业"——对应本项目停车目标点/敌对进路确认项。</span>
+          </li>
+          <li><strong>城际 C2+ATO 系统方案</strong>——车载工作模式全集。
+            <span class="src">源文件：下发资料\2016.10_城际C2+ATO系统方案.pptx · 第 34 页。要点：车载工作模式包括待机（SB）、部分监控（PS）、完全监控（FS）、引导（CO）、目视（OS）、<strong>调车（SH）</strong>、机车信号（CS）、休眠（SL）、隔离（IS）、自动驾驶（AM）。</span>
+          </li>
+        </ol>
+      </div>
+      <p style="margin-top:14px;color:var(--muted);font-size:14px;">说明：以上为本次检索到的行业资料依据，全部汇聚于此以便查阅；流程正文中不重复穿插资料引用。关键原始页码与要点已在各条目标明。</p>
+    </section>
+
+    <!-- 需确认事项 -->
+    <section>
+      <h2>六、需确认事项</h2>
+      <p>当前项目定位是仿真展示与验证原型，不是正式联锁系统设计。以下事项确认后即可落地第一版 DMI 仿真。</p>
+      <table>
+        <tr><th>#</th><th>问题</th><th>作用</th></tr>
+        <tr><td>1</td><td>调车模式（SH）限速取值，候选 40 km/h 是否可接受？</td><td>决定速度表、限速曲线与超速防护阈值</td></tr>
+        <tr><td>2</td><td>咽喉区 <code>THROAT_1/THROAT_2</code> 的真实轨道电路编号、道岔编号及定位/反位要求？</td><td>替换临时占位，决定拓扑与动画</td></tr>
+        <tr><td>3</td><td>始端调车信号机对象（<code>XC17</code> / <code>SCF17</code> / <code>XCF17</code> 或实际调车信号机）？</td><td>决定"信号开放"显示对象</td></tr>
+        <tr><td>4</td><td>停车点位置：<code>XW3G</code> 内、信号机前还是车挡/绝缘节前？</td><td>涉及安全距离与目标距离</td></tr>
+        <tr><td>5</td><td>进路解锁方式：分段解锁还是一次性解锁？</td><td>决定解锁动画与状态迁移</td></tr>
+        <tr><td>6</td><td>是否在 DMI 中演示"调车危险"与"禁止调车"（ETCS-132）防护？</td><td>高价值安全防护展示点</td></tr>
+      </table>
+    </section>
+
+  </main>
+
+  <footer>
+    <p>配图说明：图 1 为候选进路全景；图 2~12 为统一尺寸的阶段示意图，逐项展示故障停车、进路请求、道岔锁闭、信号开放、占用转移、咽喉区导向转线、目标停车和进路解锁。图中 <code>THROAT_1/THROAT_2</code> 为临时拓扑占位，不代表真实轨道电路编号。</p>
+    <p>文档定位：面向展示与汇报的远程调车 DMI/RO 仿真原型，非安全级联锁系统，亦非完整真实 ATP/ATO 产品。</p>
+  </footer>
+</div>
+</body>
+</html>
