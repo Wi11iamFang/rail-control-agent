@@ -524,13 +524,13 @@ classdef RemoteDMIApp < matlab.apps.AppBase
             app.SharedState.targetDistanceM = app.TargetDistance;
             app.SharedState.timestamp = datetime('now');
 
-            if app.DemoPhase >= 3
-                app.SharedState.scenarioState = 'SHUNT_SIGNAL_OPEN';
+            businessState = app.businessStateForDemoPhase();
+            app.SharedState.scenarioState = businessState;
+            if app.DemoPhase >= 4
                 app.SharedState.signalAspect.XC21 = 'shunting-open';
                 app.SharedState.routeState = 'signal-open';
             end
             if app.DemoPhase >= 7
-                app.SharedState.scenarioState = 'STOP_CONFIRMED';
                 app.SharedState.signalAspect.XC21 = 'closed';
             end
 
@@ -546,16 +546,21 @@ classdef RemoteDMIApp < matlab.apps.AppBase
             end
             app.SharedState = RemoteOperationState.updateTrackOccupancy( ...
                 app.SharedState, app.Topology, sectionIndex);
-            if app.DemoPhase == 0
-                app.SharedState.scenarioState = 'FAULT_STOPPED';
-            elseif app.DemoPhase == 1
-                app.SharedState.scenarioState = 'REMOTE_TAKEOVER';
-            elseif app.DemoPhase == 2
-                app.SharedState.scenarioState = 'ROUTE_REQUESTED';
-            elseif app.DemoPhase == 3
-                app.SharedState.scenarioState = 'ROUTE_LOCKED';
-            end
             app.SharedState.currentTrack = route.sections{sectionIndex};
+        end
+
+        function stateName = businessStateForDemoPhase(app)
+            phaseMap = { ...
+                'FAULT_STOPPED', ...
+                'REMOTE_TAKEOVER', ...
+                'ROUTE_REQUESTED', ...
+                'ROUTE_LOCKED', ...
+                'SHUNT_SIGNAL_OPEN', ...
+                'THROAT_PASSING', ...
+                'TARGET_BRAKING', ...
+                'STOP_CONFIRMED'};
+            phase = min(max(app.DemoPhase, 0), numel(phaseMap) - 1);
+            stateName = phaseMap{phase + 1};
         end
 
         function resetScenario(app)
