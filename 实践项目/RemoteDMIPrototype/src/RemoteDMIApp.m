@@ -110,7 +110,7 @@ classdef RemoteDMIApp < matlab.apps.AppBase
             app.prepareAxes(app.StatusAxes, [0 440], [0 220]);
 
             app.LocalMapAxes = uiaxes(app.MainPanel);
-            app.LocalMapAxes.Position = [54 28 906 110];
+            app.LocalMapAxes.Position = [180 28 780 97];
             app.prepareAxes(app.LocalMapAxes, [1 1423], [1 177]);
             app.LocalMapAxes.XLim = [1 1423];
             app.LocalMapAxes.YLim = [1 177];
