@@ -10,6 +10,7 @@ classdef RemoteDMIApp < matlab.apps.AppBase
         PlanAxes matlab.ui.control.UIAxes
         DistanceAxes matlab.ui.control.UIAxes
         StatusAxes matlab.ui.control.UIAxes
+        LocalMapAxes matlab.ui.control.UIAxes
         MessageArea matlab.ui.control.TextArea
     end
 
@@ -43,6 +44,9 @@ classdef RemoteDMIApp < matlab.apps.AppBase
         TrackState = 'A股道'
         ScenarioState = '故障停车'
         LastPhaseAnnounced = -1
+        Topology
+        SharedState
+        LocalMapImage
     end
 
     methods (Access = private)
@@ -63,6 +67,8 @@ classdef RemoteDMIApp < matlab.apps.AppBase
                 '17:11:11  车载ATO退出自动驾驶'; ...
                 '17:09:56  ATP保持制动'; ...
                 '17:09:46  当前股道：A股道'};
+            app.Topology = RouteTopology.createLocalCandidate();
+            app.SharedState = RemoteOperationState.initial(app.Topology);
             app.Plant = MinimalTrainPlant();
             app.resetScenario();
 
@@ -103,6 +109,14 @@ classdef RemoteDMIApp < matlab.apps.AppBase
             app.StatusAxes.Position = [515 52 330 208];
             app.prepareAxes(app.StatusAxes, [0 330], [0 208]);
 
+            app.LocalMapAxes = uiaxes(app.MainPanel);
+            app.LocalMapAxes.Position = [54 8 790 118];
+            app.prepareAxes(app.LocalMapAxes, [1 1423], [1 177]);
+            app.LocalMapAxes.XLim = [1 1423];
+            app.LocalMapAxes.YLim = [1 177];
+            app.LocalMapAxes.YDir = 'reverse';
+            app.LocalMapAxes.Visible = 'on';
+
             app.MessageArea = uitextarea(app.MainPanel);
             app.MessageArea.Position = [175 52 330 128];
             app.MessageArea.BackgroundColor = [0.02 0.025 0.025];
@@ -128,6 +142,7 @@ classdef RemoteDMIApp < matlab.apps.AppBase
         function refreshAll(app)
             app.drawSpeedometer();
             app.drawPlanArea();
+            app.drawLocalMap();
             app.drawDistanceAndStatus();
             app.drawBottomStatus();
             app.refreshMessages();
@@ -246,6 +261,60 @@ classdef RemoteDMIApp < matlab.apps.AppBase
                 'Color', app.C.white, 'FontSize', 11, 'FontName', 'Microsoft YaHei UI');
             text(ax, 10.3, 70, app.TrackState, 'Color', app.C.white, 'FontSize', 12, ...
                 'FontWeight', 'bold', 'FontName', 'Microsoft YaHei UI');
+        end
+
+        function drawLocalMap(app)
+            ax = app.LocalMapAxes;
+            cla(ax);
+            imagePath = app.Topology.imagePath;
+            if exist(imagePath, 'file') ~= 2
+                text(ax, 20, 90, '局部线路图未找到', 'Color', app.C.red, ...
+                    'FontName', 'Microsoft YaHei UI', 'FontSize', 12);
+                return;
+            end
+            img = imread(imagePath);
+            image(ax, 'CData', img, 'XData', [1 size(img, 2)], ...
+                'YData', [size(img, 1) 1]);
+            ax.XLim = [1 size(img, 2)];
+            ax.YLim = [1 size(img, 1)];
+            ax.YDir = 'reverse';
+            ax.XTick = [];
+            ax.YTick = [];
+            ax.Layer = 'top';
+
+            g = app.Topology.displayGeometry;
+            route = app.Topology.routes(1);
+            routePoints = [];
+            for k = 1:numel(route.sections)
+                sectionId = route.sections{k};
+                if isfield(g.sections, sectionId)
+                    points = g.sections.(sectionId);
+                    if isempty(routePoints)
+                        routePoints = points;
+                    else
+                        routePoints = [routePoints; points(2:end, :)]; %#ok<AGROW>
+                    end
+                end
+            end
+            if ~isempty(routePoints)
+                plot(ax, routePoints(:, 1), routePoints(:, 2), ...
+                    'Color', app.C.yellow, 'LineWidth', 2.5);
+            end
+
+            if isfield(g.signals, route.startSignal)
+                p = g.signals.(route.startSignal);
+                scatter(ax, p(1), p(2), 34, app.C.green, 'filled', ...
+                    'MarkerEdgeColor', app.C.white);
+            end
+            if isfield(g.labels, 'D20_APPROACH')
+                p = g.labels.D20_APPROACH;
+                text(ax, p(1), p(2), '候选目标段', 'Color', app.C.yellow, ...
+                    'FontSize', 9, 'FontName', 'Microsoft YaHei UI');
+            end
+            text(ax, 8, 14, '局部图：PNG底图 / 候选进路叠加', ...
+                'Color', app.C.white, 'FontSize', 9, ...
+                'BackgroundColor', [0.02 0.03 0.09], ...
+                'Margin', 2, 'FontName', 'Microsoft YaHei UI');
         end
 
         function drawDistanceAndStatus(app)
