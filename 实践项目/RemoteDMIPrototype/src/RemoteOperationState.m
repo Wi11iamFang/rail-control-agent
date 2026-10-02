@@ -48,5 +48,23 @@ classdef RemoteOperationState
                 out.(sections(k).id) = strcmp(sections(k).id, occupiedId);
             end
         end
+
+        function state = updateTrackOccupancy(state, topology, sectionIndex)
+            % Update the candidate route occupancy in route order.
+            route = topology.routes(1);
+            if sectionIndex < 1 || sectionIndex > numel(route.sections)
+                error('RemoteOperationState:InvalidSectionIndex', ...
+                    'Candidate route section index is out of range.');
+            end
+            for k = 1:numel(topology.sections)
+                id = topology.sections(k).id;
+                state.trackOccupancy.(id) = false;
+            end
+            state.currentTrack = route.sections{sectionIndex};
+            state.targetTrack = route.target;
+            state.trackOccupancy.(state.currentTrack) = true;
+            state.scenarioState = 'OCCUPANCY_TRANSFER';
+            state.timestamp = datetime('now');
+        end
     end
 end
