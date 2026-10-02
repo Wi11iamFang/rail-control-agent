@@ -17,6 +17,7 @@ classdef RemoteDMIApp < matlab.apps.AppBase
     properties (Access = private)
         C = struct()
         DemoTimer
+        RefreshTimer
         Buttons = {}
         IsRunning = false
         Blink = false
@@ -47,11 +48,21 @@ classdef RemoteDMIApp < matlab.apps.AppBase
         LastPhaseAnnounced = -1
         Topology
         SharedState
+        Context
+        ContextDriven = false
         LocalMapImage
     end
 
     methods (Access = private)
         function startup(app)
+            if isempty(app.Context)
+                localTopology = RouteTopology.createLocalCandidate();
+                app.Context = RemoteOperationContext(localTopology, ...
+                    RemoteOperationState.initial(localTopology), MinimalTrainPlant());
+            end
+            app.Topology = app.Context.Topology;
+            app.SharedState = app.Context.State;
+            app.Plant = app.Context.Plant;
             app.C.bg = [0.02 0.025 0.03];
             app.C.grid = [0.14 0.20 0.38];
             app.C.blue = [0.00 0.14 0.95];
@@ -68,18 +79,23 @@ classdef RemoteDMIApp < matlab.apps.AppBase
                 '17:11:11  车载ATO退出自动驾驶'; ...
                 '17:09:56  ATP保持制动'; ...
                 '17:09:46  当前股道：A股道'};
-            app.Topology = RouteTopology.createLocalCandidate();
-            app.SharedState = RemoteOperationState.initial(app.Topology);
-            app.Plant = MinimalTrainPlant();
             app.resetScenario();
 
             app.createComponents();
             app.refreshAll();
 
-            app.DemoTimer = timer( ...
-                'ExecutionMode', 'fixedSpacing', ...
-                'Period', 0.25, ...
-                'TimerFcn', @(~, ~) app.onTick());
+            if ~app.ContextDriven
+                app.DemoTimer = timer( ...
+                    'ExecutionMode', 'fixedSpacing', ...
+                    'Period', 0.25, ...
+                    'TimerFcn', @(~, ~) app.onTick());
+            else
+                app.RefreshTimer = timer( ...
+                    'ExecutionMode', 'fixedSpacing', ...
+                    'Period', 0.25, ...
+                    'TimerFcn', @(~, ~) app.refreshAll());
+                start(app.RefreshTimer);
+            end
         end
 
         function createComponents(app)
@@ -141,6 +157,9 @@ classdef RemoteDMIApp < matlab.apps.AppBase
         end
 
         function refreshAll(app)
+            if app.ContextDriven
+                app.refreshFromContext();
+            end
             app.drawSpeedometer();
             app.drawPlanArea();
             app.drawLocalMap();
@@ -149,6 +168,20 @@ classdef RemoteDMIApp < matlab.apps.AppBase
             app.refreshMessages();
             app.refreshButtons();
             drawnow limitrate;
+        end
+
+        function refreshFromContext(app)
+            s = app.Context.State;
+            app.SharedState = s;
+            app.Speed = s.speedKmh;
+            app.TargetDistance = max(0, s.targetDistanceM);
+            app.ModeText = s.mode;
+            app.BrakeText = s.brakeState;
+            app.RouteState = s.routeState;
+            app.TrackState = s.currentTrack;
+            app.ScenarioState = s.scenarioState;
+            app.KmMeter = 54.751 + s.positionM / 1000;
+            app.TrainX = min(15.2, 1.0 + s.positionM / max(app.TargetPositionM, 1) * 13.4);
         end
 
         function drawSpeedometer(app)
@@ -785,7 +818,11 @@ classdef RemoteDMIApp < matlab.apps.AppBase
     end
 
     methods (Access = public)
-        function app = RemoteDMIApp
+        function app = RemoteDMIApp(context)
+            if nargin >= 1
+                app.Context = context;
+                app.ContextDriven = true;
+            end
             startup(app);
             app.UIFigure.Visible = 'on';
         end
@@ -794,6 +831,10 @@ classdef RemoteDMIApp < matlab.apps.AppBase
             if ~isempty(app.DemoTimer) && isvalid(app.DemoTimer)
                 stop(app.DemoTimer);
                 delete(app.DemoTimer);
+            end
+            if ~isempty(app.RefreshTimer) && isvalid(app.RefreshTimer)
+                stop(app.RefreshTimer);
+                delete(app.RefreshTimer);
             end
             if ~isempty(app.UIFigure) && isvalid(app.UIFigure)
                 delete(app.UIFigure);

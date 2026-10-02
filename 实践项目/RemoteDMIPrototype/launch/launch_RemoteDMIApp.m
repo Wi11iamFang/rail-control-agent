@@ -13,7 +13,15 @@ end
 clear classes
 rehash
 
-disp('Loading RemoteDMIApp from:')
+disp('Loading RemoteDMIApp and GroundControlApp from:')
 which RemoteDMIApp
+which GroundControlApp
 
-app = RemoteDMIApp;
+% One in-process shared context; no TCP/UDP transport is used.
+topology = RouteTopology.createLocalCandidate();
+state = RemoteOperationState.initial(topology);
+plant = MinimalTrainPlant();
+sharedContext = RemoteOperationContext(topology, state, plant);
+
+groundApp = GroundControlApp(sharedContext);
+onboardApp = RemoteDMIApp(sharedContext);
