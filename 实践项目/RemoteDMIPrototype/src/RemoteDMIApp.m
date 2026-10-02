@@ -39,6 +39,7 @@ classdef RemoteDMIApp < matlab.apps.AppBase
         Notch = 0
         ServiceBrake = false
         EmergencyBrake = false
+        ManualBusinessControl = false
         RouteState = '未建立'
         SwitchState = '定位'
         TrackState = 'A股道'
@@ -406,7 +407,8 @@ classdef RemoteDMIApp < matlab.apps.AppBase
         end
 
         function drawFunctionKeys(app)
-            labels = {'数据','模式','载频','等级','其他','启动','缓解','警惕'};
+            labels = {'远程接管','办理进路','联锁检查','锁闭进路', ...
+                '开放信号','低速启动','停车确认','进路解锁'};
             app.Buttons = cell(1, numel(labels));
             top = 770;
             keyH = 78;
@@ -432,45 +434,81 @@ classdef RemoteDMIApp < matlab.apps.AppBase
             if app.IsRunning
                 app.Buttons{6}.Text = '暂停';
                 app.Buttons{6}.BackgroundColor = [0.05 0.32 0.18];
-            else
-                app.Buttons{6}.Text = '启动';
             end
-            if strcmp(app.BrakeText, '缓解')
-                app.Buttons{7}.BackgroundColor = [0.06 0.22 0.32];
-            end
-            if app.Speed > app.PermittedSpeed
-                app.Buttons{8}.BackgroundColor = app.C.orange;
+            if strcmp(app.SharedState.scenarioState, 'ROUTE_LOCKED')
+                app.Buttons{4}.BackgroundColor = [0.06 0.32 0.18];
+            elseif strcmp(app.SharedState.scenarioState, 'SHUNT_SIGNAL_OPEN')
+                app.Buttons{5}.BackgroundColor = [0.06 0.32 0.18];
+            elseif strcmp(app.SharedState.scenarioState, 'STOP_CONFIRMED')
+                app.Buttons{7}.BackgroundColor = [0.06 0.32 0.18];
             end
         end
 
         function onFunctionKey(app, keyIndex)
             switch keyIndex
                 case 1
-                    app.pushMessage(sprintf('数据：%s，速度%.1fkm/h，目标距离%.0fm', ...
-                        app.TrackState, app.Speed, app.TargetDistance));
+                    [app.SharedState, msg] = app.manualTransition('REMOTE_TAKEOVER');
+                    app.pushMessage(msg);
                 case 2
-                    app.ModeText = '调车';
-                    app.pushMessage('切换模式：调车模式');
+                    [app.SharedState, msg] = LocalInterlockingModel.requestRoute( ...
+                        app.SharedState, app.Topology);
+                    app.pushMessage(msg);
                 case 3
-                    app.pushMessage('载频菜单：上行 / 下行切换演示');
+                    [app.SharedState, msg] = LocalInterlockingModel.checkRoute( ...
+                        app.SharedState, app.Topology);
+                    app.pushMessage(msg);
                 case 4
-                    app.pushMessage('等级菜单：CTCS-2');
+                    [app.SharedState, msg] = LocalInterlockingModel.lockRoute( ...
+                        app.SharedState, app.Topology);
+                    app.pushMessage(msg);
                 case 5
-                    app.ControlText = app.toggleText(app.ControlText, '机控', '人控');
-                    app.pushMessage(['控制优先级：' app.ControlText]);
+                    [app.SharedState, msg] = LocalInterlockingModel.openSignal( ...
+                        app.SharedState, app.Topology);
+                    app.ModeText = '调车';
+                    app.pushMessage(msg);
                 case 6
-                    app.toggleDemo();
+                    app.ManualBusinessControl = true;
+                    app.Notch = 1;
+                    app.ServiceBrake = false;
+                    app.ModeText = '调车';
+                    app.pushMessage('调车信号已开放，允许低速启动');
+                    if ~app.IsRunning
+                        start(app.DemoTimer);
+                        app.IsRunning = true;
+                    end
                 case 7
-                    app.BrakeText = '缓解';
-                    app.Speed = max(0, app.Speed - 18);
-                    app.pushMessage('允许缓解，制动状态复位');
-                case 8
-                    app.Speed = min(60, app.Speed + 18);
-                    app.BrakeText = '制动';
+                    [app.SharedState, msg] = app.manualTransition('STOP_CONFIRMED');
                     app.ServiceBrake = true;
-                    app.pushMessage('警惕确认：制动提示演示');
+                    app.Notch = 0;
+                    app.pushMessage(msg);
+                case 8
+                    [app.SharedState, msg] = LocalInterlockingModel.releaseRoute( ...
+                        app.SharedState, app.Topology);
+                    app.pushMessage(msg);
             end
             app.refreshAll();
+        end
+
+        function [state, message] = manualTransition(app, targetState)
+            state = app.SharedState;
+            if strcmp(state.scenarioState, 'FAULT_STOPPED') && strcmp(targetState, 'REMOTE_TAKEOVER')
+                state.scenarioState = 'SHUNTING_MODE_READY';
+                state.mode = '调车准备';
+                state.routeState = 'takeover';
+                state.alarmState = 'none';
+                state.timestamp = datetime('now');
+                message = '远程接管完成，进入调车运行准备';
+            elseif strcmp(state.scenarioState, 'SHUNT_SIGNAL_OPEN') && strcmp(targetState, 'STOP_CONFIRMED')
+                state.scenarioState = targetState;
+                state.routeState = 'stop-confirm-pending-release';
+                state.timestamp = datetime('now');
+                message = '停车确认完成，等待进路解锁';
+            else
+                state.alarmState = 'operation-rejected';
+                state.timestamp = datetime('now');
+                message = ['操作拒绝：当前状态 ' state.scenarioState ...
+                    ' 不允许执行 ' targetState];
+            end
         end
 
         function toggleDemo(app)
@@ -524,8 +562,10 @@ classdef RemoteDMIApp < matlab.apps.AppBase
             app.SharedState.targetDistanceM = app.TargetDistance;
             app.SharedState.timestamp = datetime('now');
 
-            businessState = app.businessStateForDemoPhase();
-            app.SharedState.scenarioState = businessState;
+            if ~app.ManualBusinessControl
+                businessState = app.businessStateForDemoPhase();
+                app.SharedState.scenarioState = businessState;
+            end
             if app.DemoPhase >= 4
                 app.SharedState.signalAspect.XC21 = 'shunting-open';
                 app.SharedState.routeState = 'signal-open';
@@ -567,6 +607,7 @@ classdef RemoteDMIApp < matlab.apps.AppBase
             app.DemoPhase = 0;
             app.PhaseElapsed = 0;
             app.LastPhaseAnnounced = -1;
+            app.ManualBusinessControl = false;
             app.TargetPositionM = 420;
             app.Notch = 0;
             app.ServiceBrake = true;
