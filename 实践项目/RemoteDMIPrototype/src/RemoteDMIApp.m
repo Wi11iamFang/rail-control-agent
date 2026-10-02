@@ -299,6 +299,9 @@ classdef RemoteDMIApp < matlab.apps.AppBase
             if ~isempty(routePoints)
                 plot(ax, routePoints(:, 1), routePoints(:, 2), ...
                     'Color', app.C.yellow, 'LineWidth', 2.5);
+                trainPoint = app.routePoint(routePoints, app.Plant.PositionM);
+                scatter(ax, trainPoint(1), trainPoint(2), 48, app.C.red, ...
+                    'filled', 'MarkerEdgeColor', app.C.white, 'LineWidth', 1.2);
             end
 
             if isfield(g.signals, route.startSignal)
@@ -315,6 +318,23 @@ classdef RemoteDMIApp < matlab.apps.AppBase
                 'Color', app.C.white, 'FontSize', 9, ...
                 'BackgroundColor', [0.02 0.03 0.09], ...
                 'Margin', 2, 'FontName', 'Microsoft YaHei UI');
+        end
+
+        function point = routePoint(~, points, positionM)
+            if isempty(points)
+                point = [NaN NaN];
+                return;
+            end
+            d = sqrt(sum(diff(points, 1, 1).^2, 2));
+            cumulative = [0; cumsum(d)];
+            if cumulative(end) <= 0
+                point = points(1, :);
+                return;
+            end
+            q = min(max(positionM / 420 * cumulative(end), 0), cumulative(end));
+            x = interp1(cumulative, points(:, 1), q, 'linear');
+            y = interp1(cumulative, points(:, 2), q, 'linear');
+            point = [x y];
         end
 
         function drawDistanceAndStatus(app)
@@ -488,11 +508,57 @@ classdef RemoteDMIApp < matlab.apps.AppBase
             elseif strcmp(app.BrakeText, '制动') && app.Speed < app.PermittedSpeed - 8
                 app.BrakeText = '缓解';
             end
+            app.syncSharedState(state);
             if strcmp(app.ScenarioState, '换线完成')
                 stop(app.DemoTimer);
                 app.IsRunning = false;
             end
             app.refreshAll();
+        end
+
+        function syncSharedState(app, plantState)
+            % Publish legacy demo values into the shared candidate state.
+            app.SharedState.speedKmh = app.Speed;
+            app.SharedState.positionM = plantState.positionM;
+            app.SharedState.accelerationMps2 = plantState.accelerationMps2;
+            app.SharedState.mode = app.ModeText;
+            app.SharedState.routeState = app.RouteState;
+            app.SharedState.brakeState = app.BrakeText;
+            app.SharedState.targetDistanceM = app.TargetDistance;
+            app.SharedState.timestamp = datetime('now');
+
+            if app.DemoPhase >= 3
+                app.SharedState.scenarioState = 'SHUNT_SIGNAL_OPEN';
+                app.SharedState.signalAspect.XC21 = 'shunting-open';
+                app.SharedState.routeState = 'signal-open';
+            end
+            if app.DemoPhase >= 7
+                app.SharedState.scenarioState = 'STOP_CONFIRMED';
+                app.SharedState.signalAspect.XC21 = 'closed';
+            end
+
+            route = app.Topology.routes(1);
+            if plantState.positionM < 210
+                sectionIndex = 1;
+            elseif plantState.positionM < 285
+                sectionIndex = 2;
+            elseif plantState.positionM < 335
+                sectionIndex = 3;
+            else
+                sectionIndex = 4;
+            end
+            app.SharedState = RemoteOperationState.updateTrackOccupancy( ...
+                app.SharedState, app.Topology, sectionIndex);
+            if app.DemoPhase == 0
+                app.SharedState.scenarioState = 'FAULT_STOPPED';
+            elseif app.DemoPhase == 1
+                app.SharedState.scenarioState = 'REMOTE_TAKEOVER';
+            elseif app.DemoPhase == 2
+                app.SharedState.scenarioState = 'ROUTE_REQUESTED';
+            elseif app.DemoPhase == 3
+                app.SharedState.scenarioState = 'ROUTE_LOCKED';
+            end
+            app.SharedState.currentTrack = route.sections{sectionIndex};
         end
 
         function resetScenario(app)
@@ -504,6 +570,7 @@ classdef RemoteDMIApp < matlab.apps.AppBase
             app.ServiceBrake = true;
             app.EmergencyBrake = false;
             app.RouteState = '未建立';
+            app.SharedState = RemoteOperationState.initial(app.Topology);
             app.SwitchState = '定位';
             app.TrackState = 'A股道';
             app.ScenarioState = '故障停车';
