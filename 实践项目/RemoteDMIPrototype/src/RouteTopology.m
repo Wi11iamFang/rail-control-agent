@@ -10,10 +10,14 @@ classdef RouteTopology
             topology.id = 'LOCAL_CANDIDATE_C21_D20';
             topology.name = 'C21G1 to D20 direction candidate route';
             topology.confirmationStatus = 'candidate';
-            topology.source = '实践项目/展示图.docx';
+            topology.source = '实践项目/_zhanlishitu_local.png';
+            topology.imagePath = fullfile(fileparts(mfilename('fullpath')), '..', '..', '_zhanlishitu_local.png');
+            topology.imageSizePx = [1423, 177];
+            topology.displayCoordinateSystem = 'PNG pixel coordinates, origin at upper-left';
             topology.note = 'Temporary display topology pending formal route data confirmation.';
 
             topology.sections = RouteTopology.sections();
+            topology.displayGeometry = RouteTopology.displayGeometry();
             topology.switches = RouteTopology.switches();
             topology.signals = RouteTopology.signals();
             topology.routes = RouteTopology.routes();
@@ -76,6 +80,23 @@ classdef RouteTopology
                 'target', 'D20_APPROACH', ...
                 'releaseMode', 'to-confirm', ...
                 'confirmationStatus', 'candidate');
+        end
+
+        function geometry = displayGeometry()
+            % Coordinates are image pixels from _zhanlishitu_local.png.
+            % They are display anchors only, not verified railway data.
+            geometry = struct();
+            geometry.imageSizePx = [1423, 177];
+            geometry.sections = struct();
+            geometry.sections.C21G1 = [0, 158; 210, 158];
+            geometry.sections.THROAT_LOCAL_1 = [210, 158; 505, 158; 670, 116];
+            geometry.sections.THROAT_LOCAL_2 = [670, 116; 835, 116; 1015, 47];
+            geometry.sections.D20_APPROACH = [1015, 47; 1240, 47; 1420, 12];
+            geometry.signals = struct('XC21', [249, 157], 'D20', [863, 121], 'D16', [1384, 52]);
+            geometry.switches = struct('W_LOCAL_1', [505, 158], 'W_LOCAL_2', [835, 116]);
+            geometry.labels = struct('C21G1', [15, 157], 'THROAT_LOCAL_1', [530, 145], ...
+                'THROAT_LOCAL_2', [760, 104], 'D20_APPROACH', [1090, 35]);
+            geometry.confirmationStatus = 'display-only-candidate';
         end
     end
 end
