@@ -85,32 +85,32 @@ classdef RemoteDMIApp < matlab.apps.AppBase
             app.UIFigure = uifigure('Visible', 'off');
             app.UIFigure.Name = 'DMI 主界面仿真 - 展示交互版';
             app.UIFigure.Color = app.C.bg;
-            app.UIFigure.Position = [100 80 1024 768];
+            app.UIFigure.Position = [70 40 1280 900];
             app.UIFigure.Resize = 'off';
 
             app.MainPanel = uipanel(app.UIFigure);
             app.MainPanel.BorderType = 'line';
             app.MainPanel.BackgroundColor = app.C.bg;
-            app.MainPanel.Position = [28 28 968 712];
+            app.MainPanel.Position = [28 28 1224 844];
 
             app.SpeedAxes = uiaxes(app.MainPanel);
-            app.SpeedAxes.Position = [54 330 370 330];
+            app.SpeedAxes.Position = [54 408 430 390];
             app.prepareAxes(app.SpeedAxes, [-1.2 1.2], [-1.1 1.15]);
 
             app.PlanAxes = uiaxes(app.MainPanel);
-            app.PlanAxes.Position = [446 270 382 390];
+            app.PlanAxes.Position = [520 408 440 390];
             app.prepareAxes(app.PlanAxes, [0 16], [0 320]);
 
             app.DistanceAxes = uiaxes(app.MainPanel);
-            app.DistanceAxes.Position = [54 170 105 170];
+            app.DistanceAxes.Position = [54 170 140 210];
             app.prepareAxes(app.DistanceAxes, [0 1], [0 1000]);
 
             app.StatusAxes = uiaxes(app.MainPanel);
-            app.StatusAxes.Position = [515 52 330 208];
-            app.prepareAxes(app.StatusAxes, [0 330], [0 208]);
+            app.StatusAxes.Position = [520 155 440 220];
+            app.prepareAxes(app.StatusAxes, [0 440], [0 220]);
 
             app.LocalMapAxes = uiaxes(app.MainPanel);
-            app.LocalMapAxes.Position = [54 8 790 118];
+            app.LocalMapAxes.Position = [54 28 906 110];
             app.prepareAxes(app.LocalMapAxes, [1 1423], [1 177]);
             app.LocalMapAxes.XLim = [1 1423];
             app.LocalMapAxes.YLim = [1 177];
@@ -118,7 +118,7 @@ classdef RemoteDMIApp < matlab.apps.AppBase
             app.LocalMapAxes.Visible = 'on';
 
             app.MessageArea = uitextarea(app.MainPanel);
-            app.MessageArea.Position = [175 52 330 128];
+            app.MessageArea.Position = [205 155 290 190];
             app.MessageArea.BackgroundColor = [0.02 0.025 0.025];
             app.MessageArea.FontColor = app.C.white;
             app.MessageArea.FontName = 'Microsoft YaHei UI';
@@ -344,15 +344,12 @@ classdef RemoteDMIApp < matlab.apps.AppBase
                 'FaceColor', [0.10 0.10 0.10], 'EdgeColor', app.C.dim);
             fill(ax, [0.12 0.88 0.88 0.12], [0 0 app.TargetDistance app.TargetDistance], ...
                 [0.86 0.60 0.32], 'EdgeColor', 'none', 'FaceAlpha', 0.88);
-            text(ax, 0.50, 945, 'A1', 'Color', app.C.white, 'FontSize', 13, ...
-                'HorizontalAlignment', 'center');
-            numberY = min(950, max(610, app.TargetDistance + 45));
-            text(ax, 0.50, numberY, sprintf('%d', round(app.TargetDistance)), ...
-                'Color', app.C.white, 'FontSize', 18, 'FontWeight', 'bold', ...
-                'HorizontalAlignment', 'center');
-            text(ax, 0.50, 330, '目标', 'Color', app.C.white, 'FontSize', 15, ...
+            text(ax, 0.50, 930, '目标 A1', 'Color', app.C.white, 'FontSize', 13, ...
                 'HorizontalAlignment', 'center', 'FontName', 'Microsoft YaHei UI');
-            text(ax, 0.50, 270, '距离', 'Color', app.C.white, 'FontSize', 15, ...
+            text(ax, 0.50, 770, sprintf('%d m', round(app.TargetDistance)), ...
+                'Color', app.C.white, 'FontSize', 19, 'FontWeight', 'bold', ...
+                'HorizontalAlignment', 'center', 'FontName', 'Microsoft YaHei UI');
+            text(ax, 0.50, 570, '目标距离', 'Color', app.C.white, 'FontSize', 14, ...
                 'HorizontalAlignment', 'center', 'FontName', 'Microsoft YaHei UI');
 
             app.addStatusLabel([54 132 80 26], 'CTCS 2', app.C.white, app.C.bg);
@@ -411,12 +408,12 @@ classdef RemoteDMIApp < matlab.apps.AppBase
         function drawFunctionKeys(app)
             labels = {'数据','模式','载频','等级','其他','启动','缓解','警惕'};
             app.Buttons = cell(1, numel(labels));
-            top = 646;
-            keyH = 70;
+            top = 770;
+            keyH = 78;
             for k = 1:numel(labels)
                 y = top - (k - 1) * keyH;
                 btn = uibutton(app.MainPanel, 'push');
-                btn.Position = [850 y 88 60];
+                btn.Position = [1080 y 112 64];
                 btn.Text = labels{k};
                 btn.FontName = 'Microsoft YaHei UI';
                 btn.FontSize = 17;
