@@ -1,0 +1,29 @@
+# MATLAB temporary and generated files
+*.asv
+*.m~
+*.mexw64
+slprj/
+codegen/
+*.mat
+*.log
+
+# Local runtime output
+实践项目/RemoteDMIPrototype/outputs/
+实践项目/RemoteDMIPrototype/tmp/
+实践项目/RemoteDMIPrototype/.cache/
+
+# Codex/session and local transcription artifacts
+.codex/
+_transcribe_tmp/
+
+# External simulation software, installers, licenses and device codes
+*.exe
+*.dll
+*.lic
+MachineCode*.txt
+
+# IDE and OS files
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
