@@ -63,7 +63,8 @@ classdef RemoteOperationState
             state.currentTrack = route.sections{sectionIndex};
             state.targetTrack = route.target;
             state.trackOccupancy.(state.currentTrack) = true;
-            state.scenarioState = 'OCCUPANCY_TRANSFER';
+            % NOTE: do NOT write scenarioState here; state transitions are
+            % owned by ShuntDriver / ShuntScenarioState.
             state.timestamp = datetime('now');
         end
     end

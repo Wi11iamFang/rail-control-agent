@@ -6,6 +6,7 @@ classdef RemoteOperationContext < handle
         Topology
         State
         Plant
+        Driver
         Timer
         ManualBusinessControl = false
         IsRunning = false

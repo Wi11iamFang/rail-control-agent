@@ -1,7 +1,7 @@
 classdef RemoteDMIApp < matlab.apps.AppBase
     % RemoteDMIApp
-    % 展示型 DMI 主界面原型：按司机操作手册图 5/图 6 布局绘制，
-    % 内置轻量交互演示，不接入远程调车控制区和外部仿真设备。
+    % 车载 DMI 主界面（纯显示端）：只消费共享状态，不写状态、不操作业务。
+    % 右侧业务按钮已移除，业务动作统一由地面端（GroundControlApp + ShuntDriver）执行。
 
     properties (Access = public)
         UIFigure matlab.ui.Figure
@@ -16,50 +16,33 @@ classdef RemoteDMIApp < matlab.apps.AppBase
 
     properties (Access = private)
         C = struct()
-        DemoTimer
         RefreshTimer
-        Buttons = {}
-        IsRunning = false
         Blink = false
-        Speed = 79
-        PermittedSpeed = 160
-        TrainX = 6.2
-        TargetDistance = 610
+        Speed = 0
+        PermittedSpeed = 40
+        TrainX = 1.0
+        TargetDistance = 420
         KmMeter = 54.751
-        ModeText = 'AM'
-        StationName = '梅宋头东'
+        ModeText = '待机'
+        StationName = '宜昌北动车所'
         TrainNo = 'D2'
         DoorHint = '双侧'
-        BrakeText = '缓解'
+        BrakeText = '制动'
         ControlText = '机控'
-        MessageLog = {}
         Plant
-        DemoPhase = 0
-        PhaseElapsed = 0
         TargetPositionM = 420
-        Notch = 0
-        ServiceBrake = false
-        EmergencyBrake = false
-        ManualBusinessControl = false
         RouteState = '未建立'
         SwitchState = '定位'
-        TrackState = 'A股道'
+        TrackState = 'C21G1'
         ScenarioState = '故障停车'
-        LastPhaseAnnounced = -1
         Topology
         SharedState
         Context
-        ContextDriven = false
-        LocalMapImage
+        Renderer
     end
 
     methods (Access = private)
         function startup(app)
-            if isempty(app.Context)
-                localTopology = RouteTopology.createLocalCandidate();
-                app.Context = RemoteOperationContext(localTopology, ...
-                    RemoteOperationState.initial(localTopology), MinimalTrainPlant());
-            end
             app.Topology = app.Context.Topology;
             app.SharedState = app.Context.State;
             app.Plant = app.Context.Plant;
@@ -74,33 +57,22 @@ classdef RemoteDMIApp < matlab.apps.AppBase
             app.C.red = [1.00 0.12 0.08];
             app.C.gray = [0.34 0.36 0.37];
 
-            app.MessageLog = { ...
-                '17:11:36  故障停车，等待远程接管'; ...
-                '17:11:11  车载ATO退出自动驾驶'; ...
-                '17:09:56  ATP保持制动'; ...
-                '17:09:46  当前股道：A股道'};
             app.resetScenario();
 
             app.createComponents();
+            app.Renderer = YardViewRenderer(app.LocalMapAxes, app.Topology);
             app.refreshAll();
 
-            if ~app.ContextDriven
-                app.DemoTimer = timer( ...
-                    'ExecutionMode', 'fixedSpacing', ...
-                    'Period', 0.25, ...
-                    'TimerFcn', @(~, ~) app.onTick());
-            else
-                app.RefreshTimer = timer( ...
-                    'ExecutionMode', 'fixedSpacing', ...
-                    'Period', 0.25, ...
-                    'TimerFcn', @(~, ~) app.refreshAll());
-                start(app.RefreshTimer);
-            end
+            app.RefreshTimer = timer( ...
+                'ExecutionMode', 'fixedSpacing', ...
+                'Period', 0.25, ...
+                'TimerFcn', @(~, ~) app.refreshAll());
+            start(app.RefreshTimer);
         end
 
         function createComponents(app)
             app.UIFigure = uifigure('Visible', 'off');
-            app.UIFigure.Name = 'DMI 主界面仿真 - 展示交互版';
+            app.UIFigure.Name = '车载 DMI（纯显示，共享状态驱动）';
             app.UIFigure.Color = app.C.bg;
             app.UIFigure.Position = [70 40 1280 900];
             app.UIFigure.Resize = 'off';
@@ -128,11 +100,6 @@ classdef RemoteDMIApp < matlab.apps.AppBase
 
             app.LocalMapAxes = uiaxes(app.MainPanel);
             app.LocalMapAxes.Position = [180 28 780 97];
-            app.prepareAxes(app.LocalMapAxes, [1 1423], [1 177]);
-            app.LocalMapAxes.XLim = [1 1423];
-            app.LocalMapAxes.YLim = [1 177];
-            app.LocalMapAxes.YDir = 'reverse';
-            app.LocalMapAxes.Visible = 'on';
 
             app.MessageArea = uitextarea(app.MainPanel);
             app.MessageArea.Position = [205 155 290 190];
@@ -140,8 +107,6 @@ classdef RemoteDMIApp < matlab.apps.AppBase
             app.MessageArea.FontColor = app.C.white;
             app.MessageArea.FontName = 'Microsoft YaHei UI';
             app.MessageArea.FontSize = 15;
-
-            app.drawFunctionKeys();
         end
 
         function prepareAxes(app, ax, xlimv, ylimv)
@@ -157,16 +122,13 @@ classdef RemoteDMIApp < matlab.apps.AppBase
         end
 
         function refreshAll(app)
-            if app.ContextDriven
-                app.refreshFromContext();
-            end
+            app.refreshFromContext();
             app.drawSpeedometer();
             app.drawPlanArea();
-            app.drawLocalMap();
+            app.Renderer.update(app.Context.State);
             app.drawDistanceAndStatus();
             app.drawBottomStatus();
             app.refreshMessages();
-            app.refreshButtons();
             drawnow limitrate;
         end
 
@@ -182,6 +144,9 @@ classdef RemoteDMIApp < matlab.apps.AppBase
             app.ScenarioState = s.scenarioState;
             app.KmMeter = 54.751 + s.positionM / 1000;
             app.TrainX = min(15.2, 1.0 + s.positionM / max(app.TargetPositionM, 1) * 13.4);
+            if isfield(s.switchPosition, 'W_LOCAL_1')
+                app.SwitchState = s.switchPosition.W_LOCAL_1;
+            end
         end
 
         function drawSpeedometer(app)
@@ -265,7 +230,7 @@ classdef RemoteDMIApp < matlab.apps.AppBase
             plot(ax, [7.8 7.8], [24 48], 'Color', app.C.white, 'LineWidth', 10);
             plot(ax, [12.5 12.5], [20 55], 'Color', app.C.white, 'LineWidth', 4);
             plot(ax, [6.8 9.4], [35 78], 'Color', app.C.white, 'LineWidth', 5);
-            if any(strcmp(app.TrackState, {'道岔区','B股道'}))
+            if any(strcmp(app.TrackState, {'THROAT_LOCAL_1', 'THROAT_LOCAL_2'}))
                 plot(ax, [6.8 9.4], [35 78], 'Color', app.C.yellow, 'LineWidth', 3);
             end
 
@@ -291,84 +256,10 @@ classdef RemoteDMIApp < matlab.apps.AppBase
                 'FontSize', 13, 'FontName', 'Microsoft YaHei UI');
             text(ax, 0.8, 292, ['流程：' app.ScenarioState], 'Color', app.C.white, ...
                 'FontSize', 13, 'FontWeight', 'bold', 'FontName', 'Microsoft YaHei UI');
-            text(ax, 0.8, 274, ['进路：' app.RouteState '  道岔S1：' app.SwitchState], ...
+            text(ax, 0.8, 274, ['进路：' app.RouteState '  道岔W1：' app.SwitchState], ...
                 'Color', app.C.white, 'FontSize', 11, 'FontName', 'Microsoft YaHei UI');
             text(ax, 10.3, 70, app.TrackState, 'Color', app.C.white, 'FontSize', 12, ...
                 'FontWeight', 'bold', 'FontName', 'Microsoft YaHei UI');
-        end
-
-        function drawLocalMap(app)
-            ax = app.LocalMapAxes;
-            cla(ax);
-            imagePath = app.Topology.imagePath;
-            if exist(imagePath, 'file') ~= 2
-                text(ax, 20, 90, '局部线路图未找到', 'Color', app.C.red, ...
-                    'FontName', 'Microsoft YaHei UI', 'FontSize', 12);
-                return;
-            end
-            img = imread(imagePath);
-            image(ax, 'CData', img, 'XData', [1 size(img, 2)], ...
-                'YData', [size(img, 1) 1]);
-            ax.XLim = [1 size(img, 2)];
-            ax.YLim = [1 size(img, 1)];
-            ax.YDir = 'reverse';
-            ax.XTick = [];
-            ax.YTick = [];
-            ax.Layer = 'top';
-
-            g = app.Topology.displayGeometry;
-            route = app.Topology.routes(1);
-            routePoints = [];
-            for k = 1:numel(route.sections)
-                sectionId = route.sections{k};
-                if isfield(g.sections, sectionId)
-                    points = g.sections.(sectionId);
-                    if isempty(routePoints)
-                        routePoints = points;
-                    else
-                        routePoints = [routePoints; points(2:end, :)]; %#ok<AGROW>
-                    end
-                end
-            end
-            if ~isempty(routePoints)
-                plot(ax, routePoints(:, 1), routePoints(:, 2), ...
-                    'Color', app.C.yellow, 'LineWidth', 2.5);
-                trainPoint = app.routePoint(routePoints, app.Plant.PositionM);
-                scatter(ax, trainPoint(1), trainPoint(2), 48, app.C.red, ...
-                    'filled', 'MarkerEdgeColor', app.C.white, 'LineWidth', 1.2);
-            end
-
-            if isfield(g.signals, route.startSignal)
-                p = g.signals.(route.startSignal);
-                scatter(ax, p(1), p(2), 34, app.C.green, 'filled', ...
-                    'MarkerEdgeColor', app.C.white);
-            end
-            if isfield(g.labels, 'D20_APPROACH')
-                p = g.labels.D20_APPROACH;
-                text(ax, p(1), p(2), '候选目标段', 'Color', app.C.yellow, ...
-                    'FontSize', 9, 'FontName', 'Microsoft YaHei UI');
-            end
-            text(ax, 8, 14, '局部图：PNG底图 / 候选进路叠加', ...
-                'Color', app.C.white, 'FontSize', 9, ...
-                'BackgroundColor', [0.02 0.03 0.09], ...
-                'Margin', 2, 'FontName', 'Microsoft YaHei UI');
-        end
-
-        function point = routePoint(~, points, positionM)
-            if isempty(points)
-                point = [NaN NaN];
-                return;
-            end
-            d = sqrt(sum(diff(points, 1, 1).^2, 2));
-            cumulative = [0; cumsum(d)];
-            if cumulative(end) <= 0
-                point = points(1, :);
-                return;
-            end
-            q = min(max(positionM / 420 * cumulative(end), 0), cumulative(end));
-            x = interp1(cumulative, points(:, 1), q, 'linear');
-            y = interp1(cumulative, points(:, 2), q, 'linear');
-            point = [x y];
         end
 
         function drawDistanceAndStatus(app)
@@ -378,7 +269,7 @@ classdef RemoteDMIApp < matlab.apps.AppBase
                 'FaceColor', [0.10 0.10 0.10], 'EdgeColor', app.C.dim);
             fill(ax, [0.12 0.88 0.88 0.12], [0 0 app.TargetDistance app.TargetDistance], ...
                 [0.86 0.60 0.32], 'EdgeColor', 'none', 'FaceAlpha', 0.88);
-            text(ax, 0.50, 930, '目标 A1', 'Color', app.C.white, 'FontSize', 13, ...
+            text(ax, 0.50, 930, ['目标 ' app.TrackState], 'Color', app.C.white, 'FontSize', 13, ...
                 'HorizontalAlignment', 'center', 'FontName', 'Microsoft YaHei UI');
             text(ax, 0.50, 770, sprintf('%d m', round(app.TargetDistance)), ...
                 'Color', app.C.white, 'FontSize', 19, 'FontWeight', 'bold', ...
@@ -427,7 +318,6 @@ classdef RemoteDMIApp < matlab.apps.AppBase
 
             app.drawNetworkIcon(ax, 166, 56);
             app.drawMagnifierIcon(ax, 222, 53, '+');
-            app.drawMagnifierIcon(ax, 265, 53, '-');
             t = datetime('now');
             text(ax, 312, 86, '时间日期', 'Color', app.C.white, 'FontSize', 10, ...
                 'FontWeight', 'bold', 'FontName', 'Microsoft YaHei UI', 'HorizontalAlignment', 'center');
@@ -437,323 +327,6 @@ classdef RemoteDMIApp < matlab.apps.AppBase
                 'FontWeight', 'bold', 'FontName', 'Microsoft YaHei UI', 'HorizontalAlignment', 'center');
             app.addStatusLabel([230 20 130 28], sprintf('K%02d+%03d', floor(app.KmMeter), round(mod(app.KmMeter, 1) * 1000)), ...
                 app.C.white, app.C.bg, 17);
-        end
-
-        function drawFunctionKeys(app)
-            labels = {'远程接管','办理进路','联锁检查','锁闭进路', ...
-                '开放信号','低速启动','停车确认','进路解锁'};
-            app.Buttons = cell(1, numel(labels));
-            top = 770;
-            keyH = 78;
-            for k = 1:numel(labels)
-                y = top - (k - 1) * keyH;
-                btn = uibutton(app.MainPanel, 'push');
-                btn.Position = [1080 y 112 64];
-                btn.Text = labels{k};
-                btn.FontName = 'Microsoft YaHei UI';
-                btn.FontSize = 17;
-                btn.FontWeight = 'bold';
-                btn.FontColor = app.C.white;
-                btn.BackgroundColor = [0.13 0.17 0.24];
-                btn.ButtonPushedFcn = @(~, ~) app.onFunctionKey(k);
-                app.Buttons{k} = btn;
-            end
-        end
-
-        function refreshButtons(app)
-            for k = 1:numel(app.Buttons)
-                app.Buttons{k}.BackgroundColor = [0.13 0.17 0.24];
-            end
-            if app.IsRunning
-                app.Buttons{6}.Text = '暂停';
-                app.Buttons{6}.BackgroundColor = [0.05 0.32 0.18];
-            end
-            if strcmp(app.SharedState.scenarioState, 'ROUTE_LOCKED')
-                app.Buttons{4}.BackgroundColor = [0.06 0.32 0.18];
-            elseif strcmp(app.SharedState.scenarioState, 'SHUNT_SIGNAL_OPEN')
-                app.Buttons{5}.BackgroundColor = [0.06 0.32 0.18];
-            elseif strcmp(app.SharedState.scenarioState, 'STOP_CONFIRMED')
-                app.Buttons{7}.BackgroundColor = [0.06 0.32 0.18];
-            end
-        end
-
-        function onFunctionKey(app, keyIndex)
-            switch keyIndex
-                case 1
-                    [app.SharedState, msg] = app.manualTransition('REMOTE_TAKEOVER');
-                    app.pushMessage(msg);
-                case 2
-                    [app.SharedState, msg] = LocalInterlockingModel.requestRoute( ...
-                        app.SharedState, app.Topology);
-                    app.pushMessage(msg);
-                case 3
-                    [app.SharedState, msg] = LocalInterlockingModel.checkRoute( ...
-                        app.SharedState, app.Topology);
-                    app.pushMessage(msg);
-                case 4
-                    [app.SharedState, msg] = LocalInterlockingModel.lockRoute( ...
-                        app.SharedState, app.Topology);
-                    app.pushMessage(msg);
-                case 5
-                    [app.SharedState, msg] = LocalInterlockingModel.openSignal( ...
-                        app.SharedState, app.Topology);
-                    app.ModeText = '调车';
-                    app.pushMessage(msg);
-                case 6
-                    app.ManualBusinessControl = true;
-                    app.Notch = 1;
-                    app.ServiceBrake = false;
-                    app.ModeText = '调车';
-                    app.pushMessage('调车信号已开放，允许低速启动');
-                    if ~app.IsRunning
-                        start(app.DemoTimer);
-                        app.IsRunning = true;
-                    end
-                case 7
-                    [app.SharedState, msg] = app.manualTransition('STOP_CONFIRMED');
-                    app.ServiceBrake = true;
-                    app.Notch = 0;
-                    app.pushMessage(msg);
-                case 8
-                    [app.SharedState, msg] = LocalInterlockingModel.releaseRoute( ...
-                        app.SharedState, app.Topology);
-                    app.pushMessage(msg);
-            end
-            app.refreshAll();
-        end
-
-        function [state, message] = manualTransition(app, targetState)
-            state = app.SharedState;
-            if strcmp(state.scenarioState, 'FAULT_STOPPED') && strcmp(targetState, 'REMOTE_TAKEOVER')
-                state.scenarioState = 'SHUNTING_MODE_READY';
-                state.mode = '调车准备';
-                state.routeState = 'takeover';
-                state.alarmState = 'none';
-                state.timestamp = datetime('now');
-                message = '远程接管完成，进入调车运行准备';
-            elseif strcmp(state.scenarioState, 'SHUNT_SIGNAL_OPEN') && strcmp(targetState, 'STOP_CONFIRMED')
-                state.scenarioState = targetState;
-                state.routeState = 'stop-confirm-pending-release';
-                state.timestamp = datetime('now');
-                message = '停车确认完成，等待进路解锁';
-            else
-                state.alarmState = 'operation-rejected';
-                state.timestamp = datetime('now');
-                message = ['操作拒绝：当前状态 ' state.scenarioState ...
-                    ' 不允许执行 ' targetState];
-            end
-        end
-
-        function toggleDemo(app)
-            if app.IsRunning
-                stop(app.DemoTimer);
-                app.IsRunning = false;
-                app.pushMessage('远程调车演示暂停');
-            else
-                if app.DemoPhase == 0 || strcmp(app.ScenarioState, '换线完成')
-                    app.resetScenario();
-                end
-                start(app.DemoTimer);
-                app.IsRunning = true;
-                app.pushMessage('远程接管流程启动');
-            end
-        end
-
-        function onTick(app)
-            app.Blink = ~app.Blink;
-            dt = 0.25;
-            app.PhaseElapsed = app.PhaseElapsed + dt;
-            app.updateScenarioPhase();
-
-            state = app.Plant.step(app.Notch, app.ServiceBrake, app.EmergencyBrake, dt);
-            app.Speed = min(220, state.speedKmh);
-            app.TargetDistance = max(0, app.TargetPositionM - state.positionM);
-            app.TrainX = min(15.2, 1.0 + state.positionM / app.TargetPositionM * 13.4);
-            app.KmMeter = 54.751 + state.positionM / 1000;
-
-            if app.Speed > app.PermittedSpeed + 1
-                app.BrakeText = '制动';
-            elseif strcmp(app.BrakeText, '制动') && app.Speed < app.PermittedSpeed - 8
-                app.BrakeText = '缓解';
-            end
-            app.syncSharedState(state);
-            if strcmp(app.ScenarioState, '换线完成')
-                stop(app.DemoTimer);
-                app.IsRunning = false;
-            end
-            app.refreshAll();
-        end
-
-        function syncSharedState(app, plantState)
-            % Publish legacy demo values into the shared candidate state.
-            app.SharedState.speedKmh = app.Speed;
-            app.SharedState.positionM = plantState.positionM;
-            app.SharedState.accelerationMps2 = plantState.accelerationMps2;
-            app.SharedState.mode = app.ModeText;
-            app.SharedState.routeState = app.RouteState;
-            app.SharedState.brakeState = app.BrakeText;
-            app.SharedState.targetDistanceM = app.TargetDistance;
-            app.SharedState.timestamp = datetime('now');
-
-            if ~app.ManualBusinessControl
-                businessState = app.businessStateForDemoPhase();
-                app.SharedState.scenarioState = businessState;
-            end
-            if app.DemoPhase >= 4
-                app.SharedState.signalAspect.XC21 = 'shunting-open';
-                app.SharedState.routeState = 'signal-open';
-            end
-            if app.DemoPhase >= 7
-                app.SharedState.signalAspect.XC21 = 'closed';
-            end
-
-            route = app.Topology.routes(1);
-            if plantState.positionM < 210
-                sectionIndex = 1;
-            elseif plantState.positionM < 285
-                sectionIndex = 2;
-            elseif plantState.positionM < 335
-                sectionIndex = 3;
-            else
-                sectionIndex = 4;
-            end
-            app.SharedState = RemoteOperationState.updateTrackOccupancy( ...
-                app.SharedState, app.Topology, sectionIndex);
-            app.SharedState.currentTrack = route.sections{sectionIndex};
-        end
-
-        function stateName = businessStateForDemoPhase(app)
-            phaseMap = { ...
-                'FAULT_STOPPED', ...
-                'REMOTE_TAKEOVER', ...
-                'ROUTE_REQUESTED', ...
-                'ROUTE_LOCKED', ...
-                'SHUNT_SIGNAL_OPEN', ...
-                'THROAT_PASSING', ...
-                'TARGET_BRAKING', ...
-                'STOP_CONFIRMED'};
-            phase = min(max(app.DemoPhase, 0), numel(phaseMap) - 1);
-            stateName = phaseMap{phase + 1};
-        end
-
-        function resetScenario(app)
-            app.DemoPhase = 0;
-            app.PhaseElapsed = 0;
-            app.LastPhaseAnnounced = -1;
-            app.ManualBusinessControl = false;
-            app.TargetPositionM = 420;
-            app.Notch = 0;
-            app.ServiceBrake = true;
-            app.EmergencyBrake = false;
-            app.RouteState = '未建立';
-            app.SharedState = RemoteOperationState.initial(app.Topology);
-            app.SwitchState = '定位';
-            app.TrackState = 'A股道';
-            app.ScenarioState = '故障停车';
-            app.ModeText = '待机';
-            app.BrakeText = '制动';
-            app.ControlText = '机控';
-            app.PermittedSpeed = 40;
-            app.TargetDistance = app.TargetPositionM;
-            app.TrainX = 1.0;
-            app.Speed = 0;
-            app.KmMeter = 54.751;
-            if ~isempty(app.Plant)
-                app.Plant.reset(0);
-            end
-        end
-
-        function updateScenarioPhase(app)
-            pos = app.Plant.PositionM;
-            v = app.Plant.VelocityMps;
-
-            if app.DemoPhase == 0 && app.PhaseElapsed >= 0.75
-                app.enterPhase(1, '远程接管', '地面端取得远程接管权限');
-            elseif app.DemoPhase == 1 && app.PhaseElapsed >= 1.25
-                app.enterPhase(2, '请求进路', '请求A股道至B股道调车进路');
-            elseif app.DemoPhase == 2 && app.PhaseElapsed >= 1.25
-                app.enterPhase(3, '道岔锁闭', 'S1道岔反位锁闭，进路授权');
-            elseif app.DemoPhase == 3 && app.PhaseElapsed >= 0.75
-                app.enterPhase(4, '低速调车', '下发牵引1级，列车低速启动');
-            elseif app.DemoPhase == 4 && pos >= 210
-                app.enterPhase(5, '通过道岔', '列车进入道岔区，保持调车限速');
-            elseif app.DemoPhase == 5 && pos >= 335
-                app.enterPhase(6, '目标股道', '列车进入B股道，开始制动停车');
-            elseif app.DemoPhase == 6 && v <= 0.05 && pos >= 360
-                app.enterPhase(7, '换线完成', '远程调车换线完成，列车停车');
-            end
-
-            switch app.DemoPhase
-                case 0
-                    app.Notch = 0;
-                    app.ServiceBrake = true;
-                    app.RouteState = '未建立';
-                    app.SwitchState = '定位';
-                    app.TrackState = 'A股道';
-                    app.ModeText = '待机';
-                case 1
-                    app.Notch = 0;
-                    app.ServiceBrake = true;
-                    app.RouteState = '接管';
-                    app.ModeText = '调车';
-                case 2
-                    app.Notch = 0;
-                    app.ServiceBrake = true;
-                    app.RouteState = '请求中';
-                    app.SwitchState = '转换中';
-                case 3
-                    app.Notch = 0;
-                    app.ServiceBrake = false;
-                    app.RouteState = '已授权';
-                    app.SwitchState = '反位锁闭';
-                case 4
-                    app.Notch = 2;
-                    app.ServiceBrake = false;
-                case 5
-                    app.Notch = 1;
-                    app.ServiceBrake = app.Speed > 28;
-                    app.TrackState = '道岔区';
-                case 6
-                    app.Notch = -2;
-                    app.ServiceBrake = true;
-                    app.TrackState = 'B股道';
-                case 7
-                    app.Notch = 0;
-                    app.ServiceBrake = true;
-                    app.TrackState = 'B股道';
-                    app.RouteState = '完成';
-                    app.BrakeText = '制动';
-            end
-        end
-
-        function enterPhase(app, phase, stateText, messageText)
-            app.DemoPhase = phase;
-            app.PhaseElapsed = 0;
-            app.ScenarioState = stateText;
-            if app.LastPhaseAnnounced ~= phase
-                app.pushMessage(messageText);
-                app.LastPhaseAnnounced = phase;
-            end
-        end
-
-        function pushMessage(app, textValue)
-            stamp = datestr(datetime('now'), 'HH:MM:SS');
-            app.MessageLog = [{[stamp '  ' textValue]}; app.MessageLog(:)];
-            if numel(app.MessageLog) > 8
-                app.MessageLog = app.MessageLog(1:8);
-            end
-        end
-
-        function refreshMessages(app)
-            app.MessageArea.Value = app.MessageLog(1:min(4, numel(app.MessageLog)));
-        end
-
-        function out = toggleText(~, current, a, b)
-            if strcmp(current, a)
-                out = b;
-            else
-                out = a;
-            end
         end
 
         function drawArrowIcon(~, ax, cx, cy, direction, color)
@@ -815,23 +388,42 @@ classdef RemoteDMIApp < matlab.apps.AppBase
             h.HorizontalAlignment = 'center';
             h.VerticalAlignment = 'center';
         end
+
+        function refreshMessages(app)
+            if ~isempty(app.Context) && ~isempty(app.Context.LastMessage)
+                app.MessageArea.Value = {app.Context.LastMessage};
+            else
+                app.MessageArea.Value = {'等待地面端操作'};
+            end
+        end
+
+        function resetScenario(app)
+            app.TargetPositionM = 420;
+            app.PermittedSpeed = 40;
+            app.Speed = 0;
+            app.TargetDistance = app.TargetPositionM;
+            app.KmMeter = 54.751;
+            app.ModeText = '待机';
+            app.BrakeText = '制动';
+            app.ControlText = '机控';
+            app.RouteState = 'not-requested';
+            app.SwitchState = 'unknown';
+            app.TrackState = 'C21G1';
+            app.ScenarioState = 'FAULT_STOPPED';
+            if ~isempty(app.Plant)
+                app.Plant.reset(0);
+            end
+        end
     end
 
     methods (Access = public)
         function app = RemoteDMIApp(context)
-            if nargin >= 1
-                app.Context = context;
-                app.ContextDriven = true;
-            end
+            app.Context = context;
             startup(app);
             app.UIFigure.Visible = 'on';
         end
 
         function delete(app)
-            if ~isempty(app.DemoTimer) && isvalid(app.DemoTimer)
-                stop(app.DemoTimer);
-                delete(app.DemoTimer);
-            end
             if ~isempty(app.RefreshTimer) && isvalid(app.RefreshTimer)
                 stop(app.RefreshTimer);
                 delete(app.RefreshTimer);
