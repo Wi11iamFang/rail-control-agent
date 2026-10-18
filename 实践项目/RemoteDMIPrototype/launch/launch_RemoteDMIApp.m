@@ -1,18 +1,23 @@
 % Launch the three-ended shunting prototype from this workspace.
 % Ends: GroundControlApp (operator) + YardViewApp (shunting big screen)
 %       + RemoteDMIApp (onboard DMI), all driven by one shared context.
-% Run this script instead of adding the outputs folder to the MATLAB path.
+% Run this script from any working directory; it fixes up the path itself.
 
 thisFile = mfilename('fullpath');
 thisDir = fileparts(thisFile);
-cd(thisDir);
 
+% Put the shared src directory on the path (relative to launch/).
+srcDir = fullfile(thisDir, '..', 'src');
+if ~contains(path, srcDir)
+    addpath(srcDir);
+end
+
+% Never load legacy demo classes from the old outputs folder.
 oldOutputDir = fullfile(thisDir, 'outputs');
 if contains(path, oldOutputDir)
     rmpath(oldOutputDir);
 end
 
-clear classes
 rehash
 
 disp('Loading RemoteDMIApp, GroundControlApp, YardViewApp from:')
