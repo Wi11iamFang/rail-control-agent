@@ -22,6 +22,10 @@ classdef GroundControlApp < handle
         RefreshTimer
     end
 
+    properties (Access = private)
+        Deleted = false
+    end
+
     methods
         function app = GroundControlApp(context)
             app.Context = context;
@@ -34,23 +38,39 @@ classdef GroundControlApp < handle
         end
 
         function onTick(app)
+            % Guard against zombies after `close all force`.
+            if app.Deleted || isempty(app.UIFigure) || ~isvalid(app.UIFigure)
+                app.stopRefreshTimer();
+                return;
+            end
             if isempty(app.Context) || isempty(app.Context.State)
                 return;
             end
             if ~isempty(app.Renderer)
-                app.Renderer.update(app.Context.State);
+                try
+                    app.Renderer.update(app.Context.State);
+                catch
+                    app.stopRefreshTimer();
+                    return;
+                end
             end
             app.refresh();
         end
 
         function delete(app)
+            app.Deleted = true;
+            app.stopRefreshTimer();
+            if ~isempty(app.UIFigure) && isvalid(app.UIFigure)
+                delete(app.UIFigure);
+            end
+        end
+
+        function stopRefreshTimer(app)
             if ~isempty(app.RefreshTimer) && isvalid(app.RefreshTimer)
                 stop(app.RefreshTimer);
                 delete(app.RefreshTimer);
             end
-            if ~isempty(app.UIFigure) && isvalid(app.UIFigure)
-                delete(app.UIFigure);
-            end
+            app.RefreshTimer = [];
         end
     end
 

@@ -7,7 +7,8 @@ classdef LocalInterlockingModel
         function [state, message] = requestRoute(state, topology)
             if ~strcmp(state.scenarioState, 'SHUNTING_MODE_READY')
                 [state, message] = LocalInterlockingModel.reject(state, ...
-                    '须先完成远程接管并建立调车运行准备状态');
+                    ['操作拒绝：当前状态 ' state.scenarioState ...
+                    '；须先完成"远程接管"并进入调车运行准备状态']);
                 return;
             end
             route = topology.routes(1);
@@ -21,7 +22,8 @@ classdef LocalInterlockingModel
         function [state, message] = checkRoute(state, topology)
             if ~strcmp(state.scenarioState, 'ROUTE_REQUESTED')
                 [state, message] = LocalInterlockingModel.reject(state, ...
-                    '当前状态不允许执行联锁检查');
+                    ['操作拒绝：当前状态 ' state.scenarioState ...
+                    '；联锁检查前须先"办理进路"']);
                 return;
             end
             route = topology.routes(1);
@@ -41,7 +43,8 @@ classdef LocalInterlockingModel
         function [state, message] = lockRoute(state, topology)
             if ~strcmp(state.scenarioState, 'INTERLOCK_CHECKING')
                 [state, message] = LocalInterlockingModel.reject(state, ...
-                    '当前状态不允许锁闭进路');
+                    ['操作拒绝：当前状态 ' state.scenarioState ...
+                    '；锁闭进路前须先执行"联锁检查"']);
                 return;
             end
             route = topology.routes(1);
@@ -58,7 +61,8 @@ classdef LocalInterlockingModel
         function [state, message] = openSignal(state, topology)
             if ~strcmp(state.scenarioState, 'ROUTE_LOCKED')
                 [state, message] = LocalInterlockingModel.reject(state, ...
-                    '须先完成道岔到位和进路锁闭');
+                    ['操作拒绝：当前状态 ' state.scenarioState ...
+                    '；开放信号前须先完成"锁闭进路"']);
                 return;
             end
             signalId = topology.routes(1).startSignal;
@@ -73,7 +77,8 @@ classdef LocalInterlockingModel
         function [state, message] = releaseRoute(state, topology)
             if ~strcmp(state.scenarioState, 'STOP_CONFIRMED')
                 [state, message] = LocalInterlockingModel.reject(state, ...
-                    '须先完成停稳确认');
+                    ['操作拒绝：当前状态 ' state.scenarioState ...
+                    '；进路解锁前须先完成"停车确认"']);
                 return;
             end
             signalId = topology.routes(1).startSignal;

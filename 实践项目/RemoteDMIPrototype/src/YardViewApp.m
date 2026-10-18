@@ -16,6 +16,7 @@ classdef YardViewApp < handle
 
     properties (Access = private)
         C = struct()
+        Deleted = false
     end
 
     methods
@@ -35,10 +36,21 @@ classdef YardViewApp < handle
         end
 
         function onTick(app)
+            % Guard against zombies after `close all force`: the figure may
+            % be gone while this timer still fires. Self-clean then return.
+            if app.Deleted || isempty(app.UIFigure) || ~isvalid(app.UIFigure)
+                app.stopRefreshTimer();
+                return;
+            end
             if isempty(app.Context) || isempty(app.Context.State)
                 return;
             end
-            app.Renderer.update(app.Context.State);
+            try
+                app.Renderer.update(app.Context.State);
+            catch
+                app.stopRefreshTimer();
+                return;
+            end
             app.refreshLabels();
         end
 
@@ -49,13 +61,19 @@ classdef YardViewApp < handle
         end
 
         function delete(app)
+            app.Deleted = true;
+            app.stopRefreshTimer();
+            if ~isempty(app.UIFigure) && isvalid(app.UIFigure)
+                delete(app.UIFigure);
+            end
+        end
+
+        function stopRefreshTimer(app)
             if ~isempty(app.RefreshTimer) && isvalid(app.RefreshTimer)
                 stop(app.RefreshTimer);
                 delete(app.RefreshTimer);
             end
-            if ~isempty(app.UIFigure) && isvalid(app.UIFigure)
-                delete(app.UIFigure);
-            end
+            app.RefreshTimer = [];
         end
     end
 

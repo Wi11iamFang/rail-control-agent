@@ -142,9 +142,14 @@ classdef ShuntDriver < handle
             if ~obj.IsRunning
                 return;
             end
-            state = obj.Context.State;
-            plant = obj.Context.Plant;
-            route = obj.Context.Topology.routes(1);
+            if isempty(obj.Context) || ~isvalid(obj.Context) || isempty(obj.Context.State)
+                obj.IsRunning = false;
+                return;
+            end
+            try
+                state = obj.Context.State;
+                plant = obj.Context.Plant;
+                route = obj.Context.Topology.routes(1);
 
             % speed/limit control (bang-bang around target, 40 km/h cap)
             if state.positionM >= obj.BrakeStartM
@@ -210,6 +215,16 @@ classdef ShuntDriver < handle
 
             state.timestamp = datetime('now');
             obj.Context.publish(state, obj.LastTickMessage);
+            catch err
+                obj.IsRunning = false;
+                if ~isempty(obj.RunTimer) && isvalid(obj.RunTimer)
+                    stop(obj.RunTimer);
+                end
+                if ~isempty(obj.Context) && isvalid(obj.Context) && ...
+                        ~isempty(obj.Context.State)
+                    obj.Context.LastMessage = ['运行 tick 异常：' err.message];
+                end
+            end
         end
     end
 

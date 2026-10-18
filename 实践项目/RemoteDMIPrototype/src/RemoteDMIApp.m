@@ -18,6 +18,7 @@ classdef RemoteDMIApp < matlab.apps.AppBase
         C = struct()
         RefreshTimer
         Blink = false
+        Deleted = false
         Speed = 0
         PermittedSpeed = 40
         TrainX = 1.0
@@ -122,14 +123,32 @@ classdef RemoteDMIApp < matlab.apps.AppBase
         end
 
         function refreshAll(app)
-            app.refreshFromContext();
-            app.drawSpeedometer();
-            app.drawPlanArea();
-            app.Renderer.update(app.Context.State);
-            app.drawDistanceAndStatus();
-            app.drawBottomStatus();
-            app.refreshMessages();
-            drawnow limitrate;
+            if app.Deleted || isempty(app.UIFigure) || ~isvalid(app.UIFigure)
+                app.stopRefreshTimer();
+                return;
+            end
+            try
+                app.refreshFromContext();
+                app.drawSpeedometer();
+                app.drawPlanArea();
+                if ~isempty(app.Renderer)
+                    app.Renderer.update(app.Context.State);
+                end
+                app.drawDistanceAndStatus();
+                app.drawBottomStatus();
+                app.refreshMessages();
+                drawnow limitrate;
+            catch
+                app.stopRefreshTimer();
+            end
+        end
+
+        function stopRefreshTimer(app)
+            if ~isempty(app.RefreshTimer) && isvalid(app.RefreshTimer)
+                stop(app.RefreshTimer);
+                delete(app.RefreshTimer);
+            end
+            app.RefreshTimer = [];
         end
 
         function refreshFromContext(app)
@@ -424,10 +443,8 @@ classdef RemoteDMIApp < matlab.apps.AppBase
         end
 
         function delete(app)
-            if ~isempty(app.RefreshTimer) && isvalid(app.RefreshTimer)
-                stop(app.RefreshTimer);
-                delete(app.RefreshTimer);
-            end
+            app.Deleted = true;
+            app.stopRefreshTimer();
             if ~isempty(app.UIFigure) && isvalid(app.UIFigure)
                 delete(app.UIFigure);
             end
