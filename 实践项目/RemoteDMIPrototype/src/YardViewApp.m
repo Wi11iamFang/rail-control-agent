@@ -28,6 +28,7 @@ classdef YardViewApp < handle
             app.C.dim = [0.50 0.58 0.66];
             app.createComponents();
             app.Renderer = YardViewRenderer(app.YardAxes, app.Context.Topology);
+            app.Renderer.SignalBlink = true;   % enable blink only on the big screen
             app.refresh();
             app.RefreshTimer = timer( ...
                 'ExecutionMode', 'fixedSpacing', ...

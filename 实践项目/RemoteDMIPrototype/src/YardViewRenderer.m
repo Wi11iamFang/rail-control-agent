@@ -11,6 +11,7 @@ classdef YardViewRenderer < handle
         Ax            % uiaxes
         Topology      % RouteTopology struct
         RouteLengthM = 420  % demo mapping: positionM -> full route length
+        SignalBlink = false % blink open signal (big screen only)
     end
 
     properties (Access = private)
@@ -28,6 +29,7 @@ classdef YardViewRenderer < handle
         RouteLine      % line handle for route highlight
         TrainPatch     % patch handle for the train
         TrainText      % text handle: train number
+        SignalBlinkOn  % current blink phase
         IsBuilt = false
     end
 
@@ -49,6 +51,8 @@ classdef YardViewRenderer < handle
         function obj = YardViewRenderer(ax, topology)
             obj.Ax = ax;
             obj.Topology = topology;
+            obj.SignalBlink = false;
+            obj.SignalBlinkOn = true;
             obj.buildStatic();
             obj.buildRouteGeometry();
             obj.IsBuilt = true;
@@ -87,7 +91,8 @@ classdef YardViewRenderer < handle
                 end
             end
 
-            % Signals: shunting-open moon-white / closed red / dark
+            % Signals: shunting-open moon-white (blink if enabled) / closed red / dark
+            obj.SignalBlinkOn = ~obj.SignalBlinkOn;
             for k = 1:numel(obj.SignalKeys)
                 id = obj.SignalKeys{k};
                 aspect = 'closed';
@@ -96,7 +101,11 @@ classdef YardViewRenderer < handle
                 end
                 switch aspect
                     case 'shunting-open'
-                        set(obj.SignalHeads.(id), 'FaceColor', obj.COL_SIGNAL_OPEN);
+                        if obj.SignalBlink && ~obj.SignalBlinkOn
+                            set(obj.SignalHeads.(id), 'FaceColor', obj.COL_SIGNAL_DARK);
+                        else
+                            set(obj.SignalHeads.(id), 'FaceColor', obj.COL_SIGNAL_OPEN);
+                        end
                     case 'closed'
                         set(obj.SignalHeads.(id), 'FaceColor', obj.COL_SIGNAL_CLOSED);
                     otherwise
@@ -226,6 +235,38 @@ classdef YardViewRenderer < handle
                 'FontWeight', 'bold', 'HorizontalAlignment', 'center', ...
                 'FontName', 'Microsoft YaHei UI', ...
                 'BackgroundColor', [0.13 0.42 0.92], 'Margin', 3);
+
+            % --- Fit the view to the data aspect (no distortion) ---
+            obj.fitAxesToAspect();
+        end
+
+        function fitAxesToAspect(obj)
+            % Adjust XLim/YLlim so the visible data window matches the axes
+            % pixel aspect, preventing horizontal/vertical stretching when
+            % the same renderer is used in differently-shaped axes (yard
+            % banner vs ground panel). Data range 1423 x 177 (8.04:1).
+            ax = obj.Ax;
+            axp = get(ax, 'Position');
+            axW = axp(3); axH = axp(4);
+            if axH <= 0, return; end
+            axAspect = axW / axH;
+            dataAspect = 1423 / 177;
+
+            if axAspect >= dataAspect
+                % axes wider than data: fit by width, center vertically
+                xlim = [0 1423];
+                spanY = 1423 / axAspect;
+                ymid = 177 / 2;
+                ylim = [ymid - spanY / 2, ymid + spanY / 2];
+            else
+                % axes taller than data: fit by height, center horizontally
+                ylim = [0 177];
+                spanX = 177 * axAspect;
+                xmid = 1423 / 2;
+                xlim = [xmid - spanX / 2, xmid + spanX / 2];
+            end
+            ax.XLim = xlim;
+            ax.YLim = ylim;
         end
 
         function buildRouteGeometry(obj)
