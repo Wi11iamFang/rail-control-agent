@@ -12,6 +12,7 @@ classdef YardViewRenderer < handle
         Topology      % RouteTopology struct
         RouteLengthM = 420  % demo mapping: positionM -> full route length
         SignalBlink = false % blink open signal (big screen only)
+        ShowOtherLines = false % draw not-taken branches (big screen only)
     end
 
     properties (Access = private)
@@ -24,6 +25,7 @@ classdef YardViewRenderer < handle
         SwitchKeys     % cell of switch ids
         SignalHeads    % struct: id -> patch handle (signal lamp)
         SignalKeys     % cell of signal ids
+        OtherLines     % array of line handles (not-taken branches)
         RoutePoly      % [N x 2] polyline of the candidate route
         RouteCum       % cumulative pixel length
         RouteLine      % line handle for route highlight
@@ -48,11 +50,14 @@ classdef YardViewRenderer < handle
     end
 
     methods
-        function obj = YardViewRenderer(ax, topology)
+        function obj = YardViewRenderer(ax, topology, showOtherLines)
             obj.Ax = ax;
             obj.Topology = topology;
             obj.SignalBlink = false;
             obj.SignalBlinkOn = true;
+            if nargin >= 3
+                obj.ShowOtherLines = showOtherLines;
+            end
             obj.buildStatic();
             obj.buildRouteGeometry();
             obj.IsBuilt = true;
@@ -206,6 +211,19 @@ classdef YardViewRenderer < handle
                 plot(ax, p(1), p(2), 'o', 'MarkerSize', 8, ...
                     'MarkerFaceColor', [0.80 0.85 0.92], ...
                     'MarkerEdgeColor', [0.35 0.40 0.46], 'LineWidth', 2);
+            end
+
+            % --- Not-taken alternative lines (grey, do not follow state) ---
+            obj.OtherLines = gobjects(0);
+            if obj.ShowOtherLines && isfield(g, 'otherSections') && ...
+                    ~isempty(g.otherSections)
+                for k = 1:numel(g.otherSections)
+                    pts = g.otherSections(k).points;
+                    hl = plot(ax, pts(:, 1), pts(:, 2), '-', ...
+                        'Color', obj.COL_RAIL_DIM, 'LineWidth', 2.5, ...
+                        'Marker', 'none');
+                    obj.OtherLines(end + 1) = hl; %#ok<AGROW>
+                end
             end
 
             % --- Signal heads (colour lights) ---
