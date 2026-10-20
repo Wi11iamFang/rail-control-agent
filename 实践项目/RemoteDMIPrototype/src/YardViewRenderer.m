@@ -1,8 +1,9 @@
 classdef YardViewRenderer < handle
     %YARDVIEWRENDERER Vector yard renderer shared by the three ends.
-    %   Draws the candidate local topology as vector graphics objects once,
-    %   then updates only their properties from the shared state, so the
-    %   shunting scene animates without redrawing a PNG base image.
+    %   Renders the candidate local topology as vector graphics objects once,
+    %   then updates only their properties from the shared state. Matches the
+    %   reference line-plan look: double-rail sections, three-branch switches,
+    %   colour-light signals, round-nose train with train number.
     %
     %   Display only: never writes to the shared state.
 
@@ -13,20 +14,35 @@ classdef YardViewRenderer < handle
     end
 
     properties (Access = private)
-        SectionLines     % struct: id -> line handle
-        SectionLabels    % struct: id -> text handle
-        SwitchNormal     % struct: id -> line handle (direct branch)
-        SwitchReverse    % struct: id -> line handle (route branch)
-        SwitchPivots     % struct: id -> [x y]
-        SwitchKeys       % cell of switch ids
-        SignalHeads      % struct: id -> patch handle (signal lamp)
-        SignalKeys       % cell of signal ids
-        RoutePoly        % [N x 2] polyline of the candidate route
-        RouteCum         % cumulative pixel length
-        RouteLine        % line handle for route highlight
-        TrainPatch       % patch handle for the train
-        TrainText        % text handle "车列"
+        SectionLinesA  % struct: id -> line handle (rail A)
+        SectionLinesB  % struct: id -> line handle (rail B)
+        SectionLabels  % struct: id -> text handle
+        SwitchNormal   % struct: id -> line handle (direct branch)
+        SwitchReverse  % struct: id -> line handle (route branch)
+        SwitchPivots   % struct: id -> [x y]
+        SwitchKeys     % cell of switch ids
+        SignalHeads    % struct: id -> patch handle (signal lamp)
+        SignalKeys     % cell of signal ids
+        RoutePoly      % [N x 2] polyline of the candidate route
+        RouteCum       % cumulative pixel length
+        RouteLine      % line handle for route highlight
+        TrainPatch     % patch handle for the train
+        TrainText      % text handle: train number
         IsBuilt = false
+    end
+
+    % Colours (matching reference interlocking look)
+    properties (Constant, Access = private)
+        COL_BG        = [0.02 0.03 0.06]
+        COL_RAIL_IDLE = [0.62 0.68 0.75]
+        COL_RAIL_OCC  = [0.94 0.22 0.12]
+        COL_RAIL_LOCK = [1.00 0.92 0.20]
+        COL_RAIL_DIM  = [0.42 0.48 0.55]
+        COL_SIGNAL_OPEN = [0.95 0.96 1.00]
+        COL_SIGNAL_CLOSED = [0.92 0.16 0.10]
+        COL_SIGNAL_DARK  = [0.22 0.26 0.32]
+        COL_TEXT       = [0.92 0.96 1.00]
+        COL_TEXT_DIM   = [0.78 0.84 0.90]
     end
 
     methods
@@ -41,29 +57,33 @@ classdef YardViewRenderer < handle
         function update(obj, state)
             % Sections: occupied red / locked yellow / idle gray
             route = obj.Topology.routes(1);
+            locked = obj.isRouteLocked(state, route);
             for k = 1:numel(obj.Topology.sections)
                 id = obj.Topology.sections(k).id;
-                if ~isfield(obj.SectionLines, id), continue; end
+                if ~isfield(obj.SectionLinesA, id), continue; end
                 if isfield(state.trackOccupancy, id) && state.trackOccupancy.(id)
-                    set(obj.SectionLines.(id), 'Color', [0.90 0.18 0.10]);
-                elseif obj.isRouteLocked(state, route)
-                    set(obj.SectionLines.(id), 'Color', [1.00 0.94 0.18]);
+                    set(obj.SectionLinesA.(id), 'Color', obj.COL_RAIL_OCC, 'LineWidth', 6);
+                    set(obj.SectionLinesB.(id), 'Color', obj.COL_RAIL_OCC, 'LineWidth', 6);
+                elseif locked
+                    set(obj.SectionLinesA.(id), 'Color', obj.COL_RAIL_LOCK, 'LineWidth', 6);
+                    set(obj.SectionLinesB.(id), 'Color', obj.COL_RAIL_LOCK, 'LineWidth', 6);
                 else
-                    set(obj.SectionLines.(id), 'Color', [0.55 0.60 0.66]);
+                    set(obj.SectionLinesA.(id), 'Color', obj.COL_RAIL_IDLE, 'LineWidth', 4);
+                    set(obj.SectionLinesB.(id), 'Color', obj.COL_RAIL_IDLE, 'LineWidth', 4);
                 end
             end
 
             % Switches: lock highlights the branch used by the route
             for k = 1:numel(obj.SwitchKeys)
                 id = obj.SwitchKeys{k};
-                locked = isfield(state.switchPosition, id) && ...
+                swLocked = isfield(state.switchPosition, id) && ...
                     strcmp(state.switchPosition.(id), 'locked-candidate');
-                if locked
-                    set(obj.SwitchNormal.(id), 'Color', [0.45 0.50 0.56], 'LineWidth', 3);
-                    set(obj.SwitchReverse.(id), 'Color', [1.00 0.94 0.18], 'LineWidth', 4);
+                if swLocked
+                    set(obj.SwitchNormal.(id), 'Color', obj.COL_RAIL_DIM, 'LineWidth', 4);
+                    set(obj.SwitchReverse.(id), 'Color', obj.COL_RAIL_LOCK, 'LineWidth', 5);
                 else
-                    set(obj.SwitchNormal.(id), 'Color', [0.55 0.60 0.66], 'LineWidth', 3);
-                    set(obj.SwitchReverse.(id), 'Color', [0.55 0.60 0.66], 'LineWidth', 3);
+                    set(obj.SwitchNormal.(id), 'Color', obj.COL_RAIL_IDLE, 'LineWidth', 3);
+                    set(obj.SwitchReverse.(id), 'Color', obj.COL_RAIL_IDLE, 'LineWidth', 3);
                 end
             end
 
@@ -76,18 +96,25 @@ classdef YardViewRenderer < handle
                 end
                 switch aspect
                     case 'shunting-open'
-                        set(obj.SignalHeads.(id), 'FaceColor', [0.95 0.96 1.00]);
+                        set(obj.SignalHeads.(id), 'FaceColor', obj.COL_SIGNAL_OPEN);
                     case 'closed'
-                        set(obj.SignalHeads.(id), 'FaceColor', [0.92 0.15 0.10]);
+                        set(obj.SignalHeads.(id), 'FaceColor', obj.COL_SIGNAL_CLOSED);
                     otherwise
-                        set(obj.SignalHeads.(id), 'FaceColor', [0.20 0.24 0.30]);
+                        set(obj.SignalHeads.(id), 'FaceColor', obj.COL_SIGNAL_DARK);
                 end
+            end
+
+            % Route highlight visible when locked, dim but present otherwise
+            if locked
+                set(obj.RouteLine, 'Visible', 'on', 'Color', obj.COL_RAIL_LOCK, 'LineWidth', 3);
+            else
+                set(obj.RouteLine, 'Visible', 'on', 'Color', obj.COL_RAIL_LOCK * 0.35, 'LineWidth', 1.5);
             end
 
             % Train pose from shared position
             [x, y, theta] = obj.trainPose(state.positionM);
             obj.moveTrain(x, y, theta);
-            set(obj.TrainText, 'Position', [x y - 34]);
+            set(obj.TrainText, 'Position', [x y - 30]);
 
             drawnow limitrate;
         end
@@ -116,7 +143,7 @@ classdef YardViewRenderer < handle
         function buildStatic(obj)
             ax = obj.Ax;
             cla(ax);
-            ax.Color = [0.03 0.04 0.07];
+            ax.Color = obj.COL_BG;
             ax.XColor = 'none';
             ax.YColor = 'none';
             ax.XLim = [0 1423];
@@ -127,30 +154,33 @@ classdef YardViewRenderer < handle
 
             g = obj.Topology.displayGeometry;
 
-            % Section polylines (one line object per section)
+            % --- Section: double rails (offset perpendicular to segment) ---
             for k = 1:numel(obj.Topology.sections)
                 id = obj.Topology.sections(k).id;
                 if ~isfield(g.sections, id), continue; end
                 pts = g.sections.(id);
-                h = plot(ax, pts(:, 1), pts(:, 2), '-', ...
-                    'Color', [0.55 0.60 0.66], 'LineWidth', 5, ...
-                    'Marker', 'none');
-                obj.SectionLines.(id) = h;
+                [ra, rb] = obj.parallelRails(pts, 4);
+                ha = plot(ax, ra(:, 1), ra(:, 2), '-', ...
+                    'Color', obj.COL_RAIL_IDLE, 'LineWidth', 4, 'Marker', 'none');
+                hb = plot(ax, rb(:, 1), rb(:, 2), '-', ...
+                    'Color', obj.COL_RAIL_IDLE, 'LineWidth', 4, 'Marker', 'none');
+                obj.SectionLinesA.(id) = ha;
+                obj.SectionLinesB.(id) = hb;
             end
 
-            % Section name labels
+            % --- Section name labels (between rails) ---
             for k = 1:numel(obj.Topology.sections)
                 id = obj.Topology.sections(k).id;
                 if ~isfield(g.labels, id), continue; end
                 p = g.labels.(id);
                 obj.SectionLabels.(id) = text(ax, p(1), p(2), id, ...
-                    'Color', [0.90 0.93 1.00], 'FontSize', 10, ...
+                    'Color', obj.COL_TEXT, 'FontSize', 10, ...
                     'FontWeight', 'bold', 'FontName', 'Microsoft YaHei UI', ...
-                    'BackgroundColor', [0.03 0.04 0.07], 'Margin', 2);
+                    'BackgroundColor', [0.02 0.03 0.06], 'Margin', 3, ...
+                    'HorizontalAlignment', 'center');
             end
 
-            % Switch fork geometry: direct branch (normal) and route
-            % branch (reverse), derived from the display geometry only.
+            % --- Switches: three-direction fork ---
             ids = fieldnames(g.switches);
             obj.SwitchKeys = ids;
             for k = 1:numel(ids)
@@ -159,43 +189,43 @@ classdef YardViewRenderer < handle
                 obj.SwitchPivots.(id) = p;
                 [n1, r1] = obj.switchBranches(id, p);
                 hn = plot(ax, n1(:, 1), n1(:, 2), '-', ...
-                    'Color', [0.55 0.60 0.66], 'LineWidth', 3);
+                    'Color', obj.COL_RAIL_IDLE, 'LineWidth', 3);
                 hr = plot(ax, r1(:, 1), r1(:, 2), '-', ...
-                    'Color', [0.55 0.60 0.66], 'LineWidth', 3);
+                    'Color', obj.COL_RAIL_IDLE, 'LineWidth', 3);
                 obj.SwitchNormal.(id) = hn;
                 obj.SwitchReverse.(id) = hr;
-                plot(ax, p(1), p(2), 'o', 'MarkerSize', 7, ...
-                    'MarkerFaceColor', [0.75 0.80 0.88], ...
-                    'MarkerEdgeColor', [0.30 0.34 0.40], 'LineWidth', 1.5);
+                plot(ax, p(1), p(2), 'o', 'MarkerSize', 8, ...
+                    'MarkerFaceColor', [0.80 0.85 0.92], ...
+                    'MarkerEdgeColor', [0.35 0.40 0.46], 'LineWidth', 2);
             end
 
-            % Signal heads (lamp circle per signal)
+            % --- Signal heads (colour lights) ---
             sigIds = fieldnames(g.signals);
             obj.SignalKeys = sigIds;
             for k = 1:numel(sigIds)
                 id = sigIds{k};
                 p = g.signals.(id);
-                th = linspace(0, 2 * pi, 30);
+                th = linspace(0, 2 * pi, 32);
                 obj.SignalHeads.(id) = patch(ax, ...
-                    p(1) + 10 * cos(th), p(2) + 10 * sin(th), ...
-                    [0.20 0.24 0.30], 'EdgeColor', [0.45 0.50 0.58], ...
-                    'LineWidth', 1.5);
-                text(ax, p(1), p(2) - 16, id, 'Color', [0.75 0.82 0.90], ...
-                    'FontSize', 9, 'HorizontalAlignment', 'center', ...
-                    'FontName', 'Microsoft YaHei UI');
+                    p(1) + 11 * cos(th), p(2) + 11 * sin(th), ...
+                    obj.COL_SIGNAL_DARK, 'EdgeColor', [0.55 0.60 0.66], ...
+                    'LineWidth', 1.8);
+                text(ax, p(1), p(2) + 20, id, 'Color', obj.COL_TEXT_DIM, ...
+                    'FontSize', 10, 'FontWeight', 'bold', ...
+                    'HorizontalAlignment', 'center', 'FontName', 'Microsoft YaHei UI');
             end
 
-            % Train: rectangular patch with orientation
+            % --- Train: round-nose car body with train number ---
             x0 = 0; y0 = 158; th0 = 0;
-            obj.TrainPatch = patch(ax, NaN, NaN, [0.15 0.45 0.95], ...
-                'EdgeColor', [0.92 0.96 1.00], 'LineWidth', 1.8, ...
-                'FaceAlpha', 0.95);
+            obj.TrainPatch = patch(ax, [0 0 0 0], [0 0 0 0], ...
+                [0.13 0.42 0.92], 'EdgeColor', [0.92 0.96 1.00], ...
+                'LineWidth', 2.0, 'FaceAlpha', 0.96);
             obj.moveTrain(x0, y0, th0);
-            obj.TrainText = text(ax, x0, y0 - 34, '车列', ...
-                'Color', [0.92 0.96 1.00], 'FontSize', 10, ...
+            obj.TrainText = text(ax, x0, y0 - 30, 'D2', ...
+                'Color', [1 1 1], 'FontSize', 12, ...
                 'FontWeight', 'bold', 'HorizontalAlignment', 'center', ...
                 'FontName', 'Microsoft YaHei UI', ...
-                'BackgroundColor', [0.03 0.04 0.07], 'Margin', 2);
+                'BackgroundColor', [0.13 0.42 0.92], 'Margin', 3);
         end
 
         function buildRouteGeometry(obj)
@@ -218,8 +248,31 @@ classdef YardViewRenderer < handle
 
             ax = obj.Ax;
             obj.RouteLine = plot(ax, pts(:, 1), pts(:, 2), '-', ...
-                'Color', [1.00 0.94 0.18], 'LineWidth', 2.5, ...
-                'Visible', 'off');
+                'Color', obj.COL_RAIL_LOCK * 0.35, 'LineWidth', 1.5, ...
+                'Visible', 'on');
+        end
+
+        function [ra, rb] = parallelRails(obj, pts, off)
+            % Offset each vertex perpendicular to the segment direction,
+            % producing two parallel rails ~2*off apart (reference look).
+            n = size(pts, 1);
+            ra = pts; rb = pts;
+            for i = 1:n
+                if i < n
+                    v = pts(i + 1, :) - pts(i, :);
+                else
+                    v = pts(i, :) - pts(i - 1, :);
+                end
+                len = norm(v);
+                if len < 1e-6
+                    v = [1 0];
+                else
+                    v = v / len;
+                end
+                nv = [-v(2), v(1)] * off;
+                ra(i, :) = pts(i, :) + nv;
+                rb(i, :) = pts(i, :) - nv;
+            end
         end
 
         function [n1, r1] = switchBranches(obj, id, p)
@@ -228,7 +281,6 @@ classdef YardViewRenderer < handle
             g = obj.Topology.displayGeometry;
             n1 = [p(1) - 40, p(2); p(1) + 40, p(2)];
 
-            % Find next point of the route after the switch pivot
             route = obj.Topology.routes(1);
             nxt = [];
             for k = 1:numel(route.sections)
@@ -260,12 +312,20 @@ classdef YardViewRenderer < handle
         end
 
         function moveTrain(obj, x, y, theta)
-            L = 46; W = 18;
-            c = cos(theta); s = sin(theta);
-            corners = [-L/2 -W/2; L/2 -W/2; L/2 W/2; -L/2 W/2];
-            rot = [c -s; s c];
-            cx = corners * rot' + [x y];
-            set(obj.TrainPatch, 'XData', cx(:, 1), 'YData', cx(:, 2));
+            L = 56; W = 22; R = W / 2;          % body length/width, nose radius
+            noseStartX = L / 2 - R;
+            % rounded-nose rectangle polygon (centered at origin)
+            arcA = linspace(pi / 2, -pi / 2, 24);  % front nose arc
+            X = [-L/2, noseStartX, ...            % back-top to nose-top
+                 noseStartX + R * cos(arcA), ...  % nose arc (top -> bottom)
+                 noseStartX, -L/2];               % nose-bottom to back-bottom
+            Y = [W/2, W/2, ...                    % top edge
+                 R * sin(arcA), ...               % nose arc
+                 -W/2, -W/2];                     % bottom edge
+            rot = [cos(theta) -sin(theta); sin(theta) cos(theta)];
+            local = [X(:), Y(:)];
+            pts = local * rot' + [x y];
+            set(obj.TrainPatch, 'XData', pts(:, 1), 'YData', pts(:, 2));
         end
     end
 end
