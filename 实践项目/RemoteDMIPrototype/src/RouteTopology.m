@@ -10,9 +10,9 @@ classdef RouteTopology
             topology.id = 'LOCAL_CANDIDATE_C21_D20';
             topology.name = 'C21G1 to D20 direction candidate route';
             topology.confirmationStatus = 'candidate';
-            topology.source = '实践项目/_zhanlishitu_local.png';
-            topology.imagePath = fullfile(fileparts(mfilename('fullpath')), '..', '..', '_zhanlishitu_local.png');
-            topology.imageSizePx = [1423, 177];
+            topology.source = '实践项目/_xianlutu_ref.png (线路图.png reference)';
+            topology.imagePath = fullfile(fileparts(mfilename('fullpath')), '..', '..', '_xianlutu_ref.png');
+            topology.imageSizePx = [1311, 165];
             topology.displayCoordinateSystem = 'PNG pixel coordinates, origin at upper-left';
             topology.note = 'Temporary display topology pending formal route data confirmation.';
 
@@ -83,47 +83,50 @@ classdef RouteTopology
         end
 
         function geometry = displayGeometry()
-            % Coordinates are image pixels from _zhanlishitu_local.png.
+            % Coordinates are image pixels from 线路图.png (1311 x 165).
             % They are display anchors only, not verified railway data.
+            % Verified by pixel analysis: main track at y=102 spans full
+            % width; throat branches at y=129; right-side target at y~150.
             geometry = struct();
-            geometry.imageSizePx = [1423, 177];
+            geometry.imageSizePx = [1311, 165];
             geometry.sections = struct();
-            geometry.sections.C21G1 = [0, 158; 210, 158];
-            geometry.sections.THROAT_LOCAL_1 = [210, 158; 505, 158; 670, 116];
-            geometry.sections.THROAT_LOCAL_2 = [670, 116; 835, 116; 1015, 47];
-            geometry.sections.D20_APPROACH = [1015, 47; 1240, 47; 1420, 12];
-            geometry.signals = struct('XC21', [249, 157], 'D20', [863, 121], 'D16', [1384, 52]);
-            geometry.switches = struct('W_LOCAL_1', [505, 158], 'W_LOCAL_2', [835, 116]);
-            geometry.labels = struct('C21G1', [15, 157], 'THROAT_LOCAL_1', [530, 145], ...
-                'THROAT_LOCAL_2', [760, 104], 'D20_APPROACH', [1090, 35]);
+            % Candidate route: from left start tracks down to main line
+            % then throat switch branch into the right-side target.
+            geometry.sections.C21G1 = [4, 47; 44, 47; 200, 102; 400, 102];
+            geometry.sections.THROAT_LOCAL_1 = [400, 102; 650, 102; 795, 129];
+            geometry.sections.THROAT_LOCAL_2 = [795, 129; 856, 129; 1100, 148];
+            geometry.sections.D20_APPROACH = [1100, 148; 1254, 148; 1311, 156];
+            geometry.signals = struct('XC21', [44, 47], 'D20', [856, 129], 'D16', [1232, 148]);
+            geometry.switches = struct('W_LOCAL_1', [400, 102], 'W_LOCAL_2', [795, 129]);
+            geometry.labels = struct('C21G1', [15, 47], 'THROAT_LOCAL_1', [650, 100], ...
+                'THROAT_LOCAL_2', [856, 140], 'D20_APPROACH', [1150, 160]);
             geometry.confirmationStatus = 'display-only-candidate';
 
-            % NOT-taken alternative lines, so the yard view shows that the
-            % train is really switching routes at the throat switches (the
-            % other branches stay grey). Display-only placeholders, NOT a
-            % verified route table.
+            % NOT-taken alternative lines: straight-ahead continuations so
+            % the yard view shows a real switching decision at each throat
+            % switch. Display-only placeholders, NOT a verified route table.
             geometry.otherSections = struct('id', {}, 'points', {}, ...
                 'confirmationStatus', {});
             geometry.otherSections(end + 1) = struct( ...
                 'id', 'OTHER_W1_STRAIGHT', ...
-                'points', [505, 158; 830, 158], ...
-                'confirmationStatus', 'placeholder');   % W1 normal: C21G1 straight-ahead
+                'points', [200, 102; 400, 102; 795, 102], ...
+                'confirmationStatus', 'placeholder');   % W1 normal: stay on main line
             geometry.otherSections(end + 1) = struct( ...
                 'id', 'OTHER_W2_STRAIGHT', ...
-                'points', [835, 116; 1240, 116], ...
-                'confirmationStatus', 'placeholder');   % W2 normal: straight-ahead
+                'points', [795, 129; 856, 129; 1311, 102], ...
+                'confirmationStatus', 'placeholder');   % W2 normal: diverge left to far right
             geometry.otherSections(end + 1) = struct( ...
                 'id', 'OTHER_TRACK_N1', ...
-                'points', [0, 128; 505, 128; 830, 128], ...
-                'confirmationStatus', 'placeholder');   % parallel track above
+                'points', [4, 84; 44, 84; 200, 102], ...
+                'confirmationStatus', 'placeholder');   % parallel start track (upper)
             geometry.otherSections(end + 1) = struct( ...
                 'id', 'OTHER_TRACK_N2', ...
-                'points', [0, 98; 505, 98; 830, 98], ...
-                'confirmationStatus', 'placeholder');   % parallel track above
+                'points', [4, 120; 44, 120; 200, 102], ...
+                'confirmationStatus', 'placeholder');   % parallel start track (lower)
             geometry.otherSections(end + 1) = struct( ...
                 'id', 'OTHER_TRACK_N3', ...
-                'points', [0, 68; 505, 68; 830, 68], ...
-                'confirmationStatus', 'placeholder');   % parallel track above
+                'points', [4, 156; 44, 156; 200, 102], ...
+                'confirmationStatus', 'placeholder');   % parallel start track (lowest)
         end
     end
 end

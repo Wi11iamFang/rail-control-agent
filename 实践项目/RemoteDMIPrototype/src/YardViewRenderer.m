@@ -1,9 +1,10 @@
 classdef YardViewRenderer < handle
     %YARDVIEWRENDERER Vector yard renderer shared by the three ends.
     %   Renders the candidate local topology as vector graphics objects once,
-    %   then updates only their properties from the shared state. Matches the
-    %   reference line-plan look: double-rail sections, three-branch switches,
-    %   colour-light signals, round-nose train with train number.
+    %   then updates only their properties from the shared state. Coordinate
+    %   system follows the reference 线路图.png (1311 x 165). All text uses
+    %   Interpreter='none' so underscores never render as subscripts and
+    %   labels are padded with a background colour so they never cover rails.
     %
     %   Display only: never writes to the shared state.
 
@@ -25,6 +26,7 @@ classdef YardViewRenderer < handle
         SwitchKeys     % cell of switch ids
         SignalHeads    % struct: id -> patch handle (signal lamp)
         SignalKeys     % cell of signal ids
+        SignalNames    % struct: id -> text handle
         OtherLines     % array of line handles (not-taken branches)
         RoutePoly      % [N x 2] polyline of the candidate route
         RouteCum       % cumulative pixel length
@@ -160,29 +162,28 @@ classdef YardViewRenderer < handle
             ax.Color = obj.COL_BG;
             ax.XColor = 'none';
             ax.YColor = 'none';
-            ax.XLim = [0 1423];
-            ax.YLim = [0 177];
+            ax.XLim = [0 1311];
+            ax.YLim = [0 165];
             ax.YDir = 'reverse';
             ax.NextPlot = 'add';
             axis(ax, 'manual');
 
             g = obj.Topology.displayGeometry;
 
-            % --- Section: double rails (offset perpendicular to segment) ---
+            % --- Section: single rail (thick) ---
             for k = 1:numel(obj.Topology.sections)
                 id = obj.Topology.sections(k).id;
                 if ~isfield(g.sections, id), continue; end
                 pts = g.sections.(id);
-                [ra, rb] = obj.parallelRails(pts, 4);
-                ha = plot(ax, ra(:, 1), ra(:, 2), '-', ...
-                    'Color', obj.COL_RAIL_IDLE, 'LineWidth', 4, 'Marker', 'none');
-                hb = plot(ax, rb(:, 1), rb(:, 2), '-', ...
-                    'Color', obj.COL_RAIL_IDLE, 'LineWidth', 4, 'Marker', 'none');
+                ha = plot(ax, pts(:, 1), pts(:, 2), '-', ...
+                    'Color', obj.COL_RAIL_IDLE, 'LineWidth', 5, 'Marker', 'none');
+                hb = plot(ax, pts(:, 1), pts(:, 2), '-', ...
+                    'Color', obj.COL_RAIL_IDLE, 'LineWidth', 5, 'Marker', 'none');
                 obj.SectionLinesA.(id) = ha;
                 obj.SectionLinesB.(id) = hb;
             end
 
-            % --- Section name labels (between rails) ---
+            % --- Section name labels (padded bg, Interpreter none) ---
             for k = 1:numel(obj.Topology.sections)
                 id = obj.Topology.sections(k).id;
                 if ~isfield(g.labels, id), continue; end
@@ -190,8 +191,9 @@ classdef YardViewRenderer < handle
                 obj.SectionLabels.(id) = text(ax, p(1), p(2), id, ...
                     'Color', obj.COL_TEXT, 'FontSize', 10, ...
                     'FontWeight', 'bold', 'FontName', 'Microsoft YaHei UI', ...
-                    'BackgroundColor', [0.02 0.03 0.06], 'Margin', 3, ...
-                    'HorizontalAlignment', 'center');
+                    'BackgroundColor', obj.COL_BG, 'EdgeColor', [0.25 0.30 0.38], ...
+                    'Margin', 4, 'HorizontalAlignment', 'center', ...
+                    'Interpreter', 'none');
             end
 
             % --- Switches: three-direction fork ---
@@ -226,24 +228,29 @@ classdef YardViewRenderer < handle
                 end
             end
 
-            % --- Signal heads (colour lights) ---
+            % --- Signal heads: lamp sits ON the rail next to its curve ---
             sigIds = fieldnames(g.signals);
             obj.SignalKeys = sigIds;
             for k = 1:numel(sigIds)
                 id = sigIds{k};
                 p = g.signals.(id);
-                th = linspace(0, 2 * pi, 32);
+                r = 7;
+                th = linspace(0, 2 * pi, 16);
                 obj.SignalHeads.(id) = patch(ax, ...
-                    p(1) + 11 * cos(th), p(2) + 11 * sin(th), ...
-                    obj.COL_SIGNAL_DARK, 'EdgeColor', [0.55 0.60 0.66], ...
+                    p(1) + r * cos(th), p(2) + r * sin(th), ...
+                    obj.COL_SIGNAL_DARK, 'EdgeColor', [0.60 0.65 0.72], ...
                     'LineWidth', 1.8);
-                text(ax, p(1), p(2) + 20, id, 'Color', obj.COL_TEXT_DIM, ...
-                    'FontSize', 10, 'FontWeight', 'bold', ...
-                    'HorizontalAlignment', 'center', 'FontName', 'Microsoft YaHei UI');
+                % name under the lamp, slightly offset, never overlapping rail
+                ny = p(2) + 16;
+                obj.SignalNames.(id) = text(ax, p(1), ny, id, ...
+                    'Color', obj.COL_TEXT_DIM, 'FontSize', 8, ...
+                    'FontWeight', 'bold', 'FontName', 'Microsoft YaHei UI', ...
+                    'BackgroundColor', obj.COL_BG, 'Margin', 2, ...
+                    'HorizontalAlignment', 'center', 'Interpreter', 'none');
             end
 
             % --- Train: round-nose car body with train number ---
-            x0 = 0; y0 = 158; th0 = 0;
+            x0 = 4; y0 = 47; th0 = 0;
             obj.TrainPatch = patch(ax, [0 0 0 0], [0 0 0 0], ...
                 [0.13 0.42 0.92], 'EdgeColor', [0.92 0.96 1.00], ...
                 'LineWidth', 2.0, 'FaceAlpha', 0.96);
@@ -251,7 +258,7 @@ classdef YardViewRenderer < handle
             obj.TrainText = text(ax, x0, y0 - 30, 'D2', ...
                 'Color', [1 1 1], 'FontSize', 12, ...
                 'FontWeight', 'bold', 'HorizontalAlignment', 'center', ...
-                'FontName', 'Microsoft YaHei UI', ...
+                'FontName', 'Microsoft YaHei UI', 'Interpreter', 'none', ...
                 'BackgroundColor', [0.13 0.42 0.92], 'Margin', 3);
 
             % --- Fit the view to the data aspect (no distortion) ---
@@ -259,28 +266,24 @@ classdef YardViewRenderer < handle
         end
 
         function fitAxesToAspect(obj)
-            % Adjust XLim/YLlim so the visible data window matches the axes
-            % pixel aspect, preventing horizontal/vertical stretching when
-            % the same renderer is used in differently-shaped axes (yard
-            % banner vs ground panel). Data range 1423 x 177 (8.04:1).
+            % Adjust XLim/YLim so the visible data window matches the axes
+            % pixel aspect. Data range 1311 x 165 (7.95:1).
             ax = obj.Ax;
             axp = get(ax, 'Position');
             axW = axp(3); axH = axp(4);
             if axH <= 0, return; end
             axAspect = axW / axH;
-            dataAspect = 1423 / 177;
+            dataAspect = 1311 / 165;
 
             if axAspect >= dataAspect
-                % axes wider than data: fit by width, center vertically
-                xlim = [0 1423];
-                spanY = 1423 / axAspect;
-                ymid = 177 / 2;
+                xlim = [0 1311];
+                spanY = 1311 / axAspect;
+                ymid = 165 / 2;
                 ylim = [ymid - spanY / 2, ymid + spanY / 2];
             else
-                % axes taller than data: fit by height, center horizontally
-                ylim = [0 177];
-                spanX = 177 * axAspect;
-                xmid = 1423 / 2;
+                ylim = [0 165];
+                spanX = 165 * axAspect;
+                xmid = 1311 / 2;
                 xlim = [xmid - spanX / 2, xmid + spanX / 2];
             end
             ax.XLim = xlim;
@@ -309,29 +312,6 @@ classdef YardViewRenderer < handle
             obj.RouteLine = plot(ax, pts(:, 1), pts(:, 2), '-', ...
                 'Color', obj.COL_RAIL_LOCK * 0.35, 'LineWidth', 1.5, ...
                 'Visible', 'on');
-        end
-
-        function [ra, rb] = parallelRails(obj, pts, off)
-            % Offset each vertex perpendicular to the segment direction,
-            % producing two parallel rails ~2*off apart (reference look).
-            n = size(pts, 1);
-            ra = pts; rb = pts;
-            for i = 1:n
-                if i < n
-                    v = pts(i + 1, :) - pts(i, :);
-                else
-                    v = pts(i, :) - pts(i - 1, :);
-                end
-                len = norm(v);
-                if len < 1e-6
-                    v = [1 0];
-                else
-                    v = v / len;
-                end
-                nv = [-v(2), v(1)] * off;
-                ra(i, :) = pts(i, :) + nv;
-                rb(i, :) = pts(i, :) - nv;
-            end
         end
 
         function [n1, r1] = switchBranches(obj, id, p)
@@ -371,16 +351,15 @@ classdef YardViewRenderer < handle
         end
 
         function moveTrain(obj, x, y, theta)
-            L = 56; W = 22; R = W / 2;          % body length/width, nose radius
+            L = 44; W = 18; R = W / 2;          % body length/width, nose radius
             noseStartX = L / 2 - R;
-            % rounded-nose rectangle polygon (centered at origin)
-            arcA = linspace(pi / 2, -pi / 2, 24);  % front nose arc
-            X = [-L/2, noseStartX, ...            % back-top to nose-top
-                 noseStartX + R * cos(arcA), ...  % nose arc (top -> bottom)
-                 noseStartX, -L/2];               % nose-bottom to back-bottom
-            Y = [W/2, W/2, ...                    % top edge
-                 R * sin(arcA), ...               % nose arc
-                 -W/2, -W/2];                     % bottom edge
+            arcA = linspace(pi / 2, -pi / 2, 24);
+            X = [-L/2, noseStartX, ...
+                 noseStartX + R * cos(arcA), ...
+                 noseStartX, -L/2];
+            Y = [W/2, W/2, ...
+                 R * sin(arcA), ...
+                 -W/2, -W/2];
             rot = [cos(theta) -sin(theta); sin(theta) cos(theta)];
             local = [X(:), Y(:)];
             pts = local * rot' + [x y];
